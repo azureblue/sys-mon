@@ -54,14 +54,6 @@ static int write_data(module_data data, writter_t *wr) {
     return 0;
 }
 
-
-static int write_desc(module_data data, writter_t *wr) {
-    char desc[256];
-    sprintf(desc, "block device usage [%s] (bytes = sectors * 512), format: [read_ops]:uint [write_ops]:uint [read_bytes]:uint [write_bytes]:uint",
-        ((disk_usage_data*) data)->device_info);
-    write_string(wr, desc);
-}
-
 struct module_config module_init_disk(char *args) {
     char path[128];
     sprintf(path, "/sys/block/%s/stat", args);
@@ -76,6 +68,5 @@ struct module_config module_init_disk(char *args) {
     ((struct disk_usage_data *) config.data)->fd = fd;
     update_data(config.data);
     config.write_data = write_data;
-    config.write_description = write_desc;
     return config;
 }

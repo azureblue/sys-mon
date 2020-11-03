@@ -10,7 +10,6 @@ typedef int (*module_write_data_callback)(module_data data, writter_t *wt);
 
 struct module_config {
     module_write_data_callback write_data;
-    module_write_data_callback write_description;
     module_data data;
 };
 

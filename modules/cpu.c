@@ -49,10 +49,6 @@ static int write_data(module_data data, writter_t *wr) {
     return 0;
 }
 
-static int write_desc(module_data data, writter_t *wt) {
-    return write_string(wt, "total cpu usage, format: [percentage_cpu_usage]:uint");
-}
-
 struct module_config module_init_cpu(char *args) {
     struct module_config spec;
     int fd = open("/proc/stat", O_RDONLY);
@@ -62,7 +58,6 @@ struct module_config module_init_cpu(char *args) {
     }
     spec.data = malloc(sizeof(cpu_data_t));
     ((cpu_data_t *)spec.data)->fd = fd;
-    spec.write_description = write_desc;
     spec.write_data = write_data;
     update_data(spec.data);
     return spec;

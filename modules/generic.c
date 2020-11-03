@@ -19,8 +19,6 @@ struct gen_data {
 
 typedef struct gen_data gen_data_t;
 
-static char description[] = {0};
-
 static int write_data(module_data data, writter_t *wr) {
     gen_data_t * gen_data = data;
     lseek(gen_data->fd, 0, SEEK_SET);
@@ -29,13 +27,6 @@ static int write_data(module_data data, writter_t *wr) {
     int div = gen_data->div;
     int value = (next_uint() + div / 2) / div;
     return write_uint(wr, value);
-}
-
-static int write_desc(module_data data, writter_t *wr) {
-    char desc[256];
-    sprintf(desc, "generic info <%s> divided by <%d>, format: [value]:uint",
-        ((gen_data_t*) data)->source_desc, ((gen_data_t*) data)->div);
-    write_string(wr, desc);
 }
 
 struct module_config module_init_generic(char *args) {
@@ -51,7 +42,6 @@ struct module_config module_init_generic(char *args) {
     config.write_data = write_data;
     config.data = calloc(1, sizeof (struct gen_data) + strlen(path) + 1);
     strcpy(((gen_data_t *)config.data)->source_desc, path);
-    config.write_description = write_desc;
     ((gen_data_t *)config.data)->fd = fd;
     ((gen_data_t *)config.data)->div = div;
     return config;

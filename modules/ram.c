@@ -30,10 +30,6 @@ static int write_data(module_data data, writter_t *wr) {
     write_uint(wr, free);
 }
 
-static int write_desc(module_data data, writter_t *wt) {
-    return write_string(wt, "ram usage, format: [total ram (MB)]:uint [free ram(MB)]:uint");
-}
-
 struct module_config module_init_ram(char *args) {
     struct module_config config;
     int fd = open("/proc/meminfo", O_RDONLY);
@@ -43,7 +39,6 @@ struct module_config module_init_ram(char *args) {
     }
     config.data = calloc(1, sizeof(ram_data));
     ((ram_data*)config.data)->fd = fd;
-    config.write_description = write_desc;
     config.write_data = write_data;
     return config;
  }

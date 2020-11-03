@@ -24,6 +24,7 @@ inline int write_char(writter_t *wr, char c) {
     if (wr->pos == wr->len)
         return -1;
     wr->buffer[wr->pos++] = c;
+    return 0;
 }
 
 int write_string(writter_t *wr, const char *str) {
@@ -49,4 +50,3 @@ int write_uint(writter_t *wr, unsigned int i) {
 
     return res_code;
 }
-
