@@ -16,7 +16,7 @@ Goals:
 - extendable (modules, for now the config is hardcoded in sys-mon.c)
 
 Results:
-- not highly advanced benchmark utils has been used: the Linux *time* command :P but is shows that (doing 10^6 iterations in a row) reading data from sys-mon-shm times was faster than openning reading and closing all needed files
-- it wasn't much faster
-- the main bottleneck was kernel that uses slow? *printf function to output data to sysfs/procfs
+- not highly advanced benchmark utils have been used - the Linux *time* command :P - but is showed that (doing 10^6 iterations in a row) reading data from sys-mon-shm times was faster than openning reading and closing all needed files
+- it wasn't *much* faster
+- the main bottleneck was kernel that uses slow? [.*]printf function to output data to sysfs/procfs
 - a new idea to create a kernel module to be even faster
