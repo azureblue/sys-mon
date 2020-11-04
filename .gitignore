@@ -1,3 +1,4 @@
 *.o
 *.so
 sys-mon
+simple-client

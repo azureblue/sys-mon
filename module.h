@@ -13,11 +13,7 @@ struct module_config {
     module_data data;
 };
 
-typedef struct module_config (*module_init)(char * module_args);
-
-struct module_config module_init_cpu(char *args);
-struct module_config module_init_disk(char *args);
-struct module_config module_init_ram(char *args);
-struct module_config module_init_generic(char *args);
+typedef struct module_config module_config;
+typedef module_config (*module_init)(char * module_args);
 
 #endif

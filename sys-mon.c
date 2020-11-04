@@ -1,3 +1,4 @@
+#include <dlfcn.h>
 #include <semaphore.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -14,19 +15,42 @@
 #include "module.h"
 #include "shared_buf.h"
 
-#define MODS 8
+#define MAX_CONF_LINE_SIZE 256
+#ifndef MAX_MODULES
+#define MAX_MODULES 32
+#endif
+module_config modules[MAX_MODULES];
+static int modules_n = 0;
 
-struct module_config modules[MODS];
-
-void init_modules() {
-    modules[0] = module_init_cpu(NULL);
-    modules[1] = module_init_ram(NULL);
-    modules[2] = module_init_generic("/sys/class/hwmon/hwmon0/temp2_input 1000");
-    modules[3] = module_init_generic("/sys/class/hwmon/hwmon0/temp3_input 1000");
-    modules[4] = module_init_generic("/sys/bus/cpu/devices/cpu0/cpufreq/cpuinfo_cur_freq 1000");
-    modules[5] = module_init_generic("/sys/bus/cpu/devices/cpu1/cpufreq/cpuinfo_cur_freq 1000");
-    modules[6] = module_init_disk("sda");
-    modules[7] = module_init_disk("sdb");
+void init_modules(const char* config_path) {
+    memptr_t dl = dlopen(NULL, RTLD_LAZY);
+    FILE * conf = fopen(config_path, "r");
+    char line[MAX_CONF_LINE_SIZE + 1];
+    while (fgets(line, MAX_CONF_LINE_SIZE + 1, conf) != NULL) {
+        if (modules_n == MAX_MODULES) {
+            fprintf(stderr, "too many modules in config\n");
+            exit(-1);
+        }
+        if (strlen(line) > MAX_CONF_LINE_SIZE) {
+            fprintf(stderr, "invalid conf file, line too long\n");
+            exit(-1);
+        }
+        char module_name[32];
+        if (sscanf(line, "%31s", module_name) != 1) {
+            fprintf(stderr, "invalid config line: %d\n", modules_n + 1);
+            exit(-1);
+        }
+        char module_init_name[50] = "module_init_";
+        strcat(module_init_name, module_name);
+        module_init init = dlsym(dl, module_init_name);
+        if (init == NULL) {
+            fprintf(stderr, "can't load module %s: %s\n", module_name, dlerror());
+            exit(-1);
+        }
+        modules[modules_n] = init(line + strlen(module_name));
+        modules_n++;
+    }
+    fclose(conf);
 }
 
 static const char* shm_name = "/sys-mon";
@@ -43,11 +67,15 @@ static void handle_signal(int sig) {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     signal(SIGTERM, handle_signal);
     signal(SIGINT, handle_signal);
 
-    init_modules();
+    if (argc < 2) {
+            fprintf(stderr, "missing file path\n");
+            exit(-1);
+    }
+    init_modules(argv[1]);
     mode_t old_umask = umask(0);
     int shm_fd = shm_open(shm_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH);
     umask(old_umask);
@@ -76,11 +104,15 @@ int main() {
     while (true) {
         sem_wait(&sh_buf->in);
         wr.pos = 0;
-        for (int i = 0; i < MODS; i++) {
-            int written = modules[i].write_data(modules[i].data, &wr);
+        for (int i = 0; i < modules_n; i++) {
+            modules[i].write_data(modules[i].data, &wr);
             write_char(&wr, '\n');
         }
-        write_char(&wr, 0);
+        if (write_char(&wr, 0) == -1) {
+            fprintf(stderr, "not enough shm space\n");
+            raise(SIGTERM);
+        }
+
         sem_post(&sh_buf->out);
     }
 }

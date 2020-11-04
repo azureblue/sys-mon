@@ -1,12 +1,13 @@
-CFLAGS= -O3 -fno-stack-protector
+CFLAGS= -std=c11 -g -fno-stack-protector
 SRCS=$(wildcard *.c) $(wildcard modules/*.c)
 OBJS=$(SRCS:.c=.o)
 
 %.o : %.c
-	gcc -c $(CFLAGS) $< -o $@
+	gcc -c -D_POSIX_C_SOURCE=200112L -rdynamic $(CFLAGS) $< -o $@
 
-all: $(OBJS)
-	gcc $(CFLAGS) $(OBJS) -lrt -lpthread -o sys-mon
+all: $(OBJS) simple-client
+	gcc $(CFLAGS) --whole-file -rdynamic $(OBJS) -lrt -lpthread -ldl -o sys-mon
+	strip sys-mon
 
 simple-client:
 	gcc $(CFLAGS) client/simple-client.c -lrt -lpthread -o simple-client

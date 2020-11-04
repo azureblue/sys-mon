@@ -32,7 +32,10 @@ static int write_data(module_data data, writter_t *wr) {
 struct module_config module_init_generic(char *args) {
     char path[128];
     int div;
-    sscanf(args, "%s %d", path, &div);
+    if (sscanf(args, "%s %d", path, &div) != 2) {
+        perror("generic module: too few arguments");
+        exit(-1);
+    }
     struct module_config config;
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
