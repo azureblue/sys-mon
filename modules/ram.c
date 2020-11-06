@@ -22,9 +22,9 @@ static int write_data(module_data data, writter_t *wr) {
     lseek(mem_data->fd, 0, SEEK_SET);
     if (read_to_buffer(mem_data->fd, REQUIRED_BUFFER_SIZE) == -1)
         return -1;
-    int max = next_uint() / 1000;
-    skip_int(1);
-    int free = next_uint() / 1000;
+    int max = read_next_uint() / 1000;
+    read_skip_int(1);
+    int free = read_next_uint() / 1000;
     write_uint(wr, max);
     write_char(wr, ' ');
     write_uint(wr, free);

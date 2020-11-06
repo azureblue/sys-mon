@@ -2,3 +2,5 @@
 *.so
 sys-mon
 simple-client
+genmon/genmon
+genmon/beep

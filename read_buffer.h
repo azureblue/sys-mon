@@ -7,6 +7,6 @@
 extern char read_buffer[];
 
 int read_to_buffer(int fd, int size);
-int next_uint();
-int skip_int(int n);
+int read_next_uint();
+int read_skip_int(int n);
 

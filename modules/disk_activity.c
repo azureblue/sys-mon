@@ -30,9 +30,9 @@ static int update_data(disk_activity_data *disk_data) {
     unsigned int flags = disk_data->flags;
     for (int i = 0; i < 8; i++) {
         if (flags & 1)
-            disk_data->data[i] = next_uint();
+            disk_data->data[i] = read_next_uint();
         else
-            skip_int(1);
+            read_skip_int(1);
         flags >>= 1;
     }
 }

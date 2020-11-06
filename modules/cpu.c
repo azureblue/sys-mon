@@ -24,10 +24,10 @@ static int update_data(cpu_data_t *data) {
     lseek(data->fd, 0, SEEK_SET);
     if (read_to_buffer(data->fd, REQUIRED_BUFFER_SIZE) == -1)
         return -1;
-    int user = next_uint();
-    int nice = next_uint();
-    int sys = next_uint();
-    int idle = next_uint();
+    int user = read_next_uint();
+    int nice = read_next_uint();
+    int sys = read_next_uint();
+    int idle = read_next_uint();
     int sum = user + nice + sys + idle;
     data->sum = sum;
     data->idle = idle;

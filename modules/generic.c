@@ -25,7 +25,7 @@ static int write_data(module_data data, writter_t *wr) {
     if (read_to_buffer(gen_data->fd, REQUIRED_BUFFER_SIZE) == -1)
         return -1;
     int div = gen_data->div;
-    int value = (next_uint() + div / 2) / div;
+    int value = (read_next_uint() + div / 2) / div;
     return write_uint(wr, value);
 }
 

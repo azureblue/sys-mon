@@ -36,7 +36,7 @@ inline static int is_whitespace(char c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
-int next_uint() {
+int read_next_uint() {
     int res = 0;
     while (read_buffer_pos < BUFFER_SIZE) {
         if (is_number(read_buffer[read_buffer_pos]))
@@ -53,7 +53,7 @@ int next_uint() {
     return res;
 }
 
-int skip_int(int n) {
+int read_skip_int(int n) {
     while (n--) {
         while (read_buffer_pos < BUFFER_SIZE) {
             if (is_number(read_buffer[read_buffer_pos]))
