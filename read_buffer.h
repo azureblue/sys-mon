@@ -1,12 +1,4 @@
-#include <stddef.h>
-
-#ifndef BUFFER_SIZE
-#define BUFFER_SIZE 512
-#endif
-
-extern char read_buffer[];
-
-int read_to_buffer(int fd, int size);
-int read_next_uint();
-int read_skip_int(int n);
-
+int read_init(int fd);
+int read_next_uint(int fd, unsigned int *out);
+int next_line(int fd);
+int skip_next(int fd);

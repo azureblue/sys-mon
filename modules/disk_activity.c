@@ -7,32 +7,27 @@
 #include "../writter.h"
 #include "../module.h"
 
-#define REQUIRED_BUFFER_SIZE 128
-#if REQUIRED_BUFFER_SIZE > BUFFER_SIZE
-#error BUFFER_SIZE too small;
-#endif
-
 static const int R_RQS = 1 << 0, R_MERGES = 1 << 1, R_SECTORS = 1 << 2, R_TICKS = 1 << 3,
                  W_RQS = 1 << 4, W_MERGES = 1 << 5, W_SECTORS = 1 << 6, W_TICKS = 1 << 7;
 
 struct disk_activity_data {
     int fd;
     int flags;
-    int data[8];
+    unsigned int data[8];
 };
 
 typedef struct disk_activity_data disk_activity_data;
 
 static int update_data(disk_activity_data *disk_data) {
-    lseek(disk_data->fd, 0, SEEK_SET);
-    if (read_to_buffer(disk_data->fd, REQUIRED_BUFFER_SIZE) == -1)
-        return -1;
+    int fd = disk_data->fd;
+    lseek(fd, 0, SEEK_SET);
+    read_init(fd);
     unsigned int flags = disk_data->flags;
     for (int i = 0; i < 8; i++) {
         if (flags & 1)
-            disk_data->data[i] = read_next_uint();
+            read_next_uint(fd, &disk_data->data[i]);
         else
-            read_skip_int(1);
+            skip_next(fd);
         flags >>= 1;
     }
 }

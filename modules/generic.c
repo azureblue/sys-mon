@@ -6,11 +6,6 @@
 #include "../module.h"
 #include "../read_buffer.h"
 
-#define REQUIRED_BUFFER_SIZE 64
-#if REQUIRED_BUFFER_SIZE > BUFFER_SIZE
-#error BUFFER_SIZE too small;
-#endif
-
 struct gen_data {
     int fd;
     int div;
@@ -22,10 +17,11 @@ typedef struct gen_data gen_data_t;
 static int write_data(module_data data, writter_t *wr) {
     gen_data_t * gen_data = data;
     lseek(gen_data->fd, 0, SEEK_SET);
-    if (read_to_buffer(gen_data->fd, REQUIRED_BUFFER_SIZE) == -1)
-        return -1;
+    read_init(gen_data->fd);
     int div = gen_data->div;
-    int value = (read_next_uint() + div / 2) / div;
+    unsigned int value;
+    read_next_uint(gen_data->fd, &value);
+    value = (value + div / 2) / div;
     return write_uint(wr, value);
 }
 

@@ -3,31 +3,38 @@
 #include <string.h>
 #include <sys/fcntl.h>
 #include <unistd.h>
+
 #include "../module.h"
 #include "../read_buffer.h"
 #include "../writter.h"
 
-#define REQUIRED_BUFFER_SIZE 128
-#if REQUIRED_BUFFER_SIZE > BUFFER_SIZE
-    #error BUFFER_SIZE too small;
-#endif
-
 struct ram_data {
     int fd;
 };
+
 typedef struct ram_data ram_data;
 
 static int write_data(module_data data, writter_t *wr) {
-    ram_data * mem_data = data;
-    lseek(mem_data->fd, 0, SEEK_SET);
-    if (read_to_buffer(mem_data->fd, REQUIRED_BUFFER_SIZE) == -1)
-        return -1;
-    int max = read_next_uint() / 1000;
-    read_skip_int(1);
-    int free = read_next_uint() / 1000;
-    write_uint(wr, max);
+    ram_data *mem_data = data;
+    int fd = mem_data->fd;
+    lseek(fd, 0, SEEK_SET);
+    read_init(fd);
+    int max, free;
+    skip_next(fd);
+    read_next_uint(fd, &max);
+    skip_next(fd);
+
+    skip_next(fd);
+    skip_next(fd);
+    skip_next(fd);
+
+    skip_next(fd);
+    read_next_uint(fd, &free);
+    skip_next(fd);
+
+    write_uint(wr, max / 1000);
     write_char(wr, ' ');
-    write_uint(wr, free);
+    write_uint(wr, free / 1000);
 }
 
 struct module_config module_init_ram(char *args) {
@@ -38,7 +45,7 @@ struct module_config module_init_ram(char *args) {
         exit(-1);
     }
     config.data = calloc(1, sizeof(ram_data));
-    ((ram_data*)config.data)->fd = fd;
+    ((ram_data *)config.data)->fd = fd;
     config.write_data = write_data;
     return config;
- }
+}

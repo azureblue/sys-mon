@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
     }
     init_modules(argv[1]);
     mode_t old_umask = umask(0);
-    int shm_fd = shm_open(shm_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH);
+    int shm_fd = shm_open(shm_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
     umask(old_umask);
 
     if (shm_fd == -1) {
