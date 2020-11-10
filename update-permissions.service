@@ -1,0 +1,9 @@
+[Unit]
+Description=Adding permissions to read cpuinfo_cur_freq
+
+
+[Service]
+ExecStart=/usr/bin/bash -c 'sudo chmod +r /sys/bus/cpu/devices/cpu*/cpufreq/cpuinfo_cur_freq'
+
+[Install]
+WantedBy=multi-user.target

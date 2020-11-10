@@ -1,4 +1,6 @@
-CFLAGS= -g -std=c11  -fno-stack-protector
+CFLAGS= -O3 -std=c11  -fno-stack-protector
+#CFLAGS= -g -std=c11  -fno-stack-protector
+
 SRCS=$(wildcard *.c) $(wildcard modules/*.c)
 OBJS=$(SRCS:.c=.o)
 
@@ -22,10 +24,6 @@ beep: $(OBJS_BEEP)
 	gcc $(CFLAGS) $(OBJS_BEEP) -o genmon/beep
 	sudo chown root genmon/beep
 	sudo chmod 4775 genmon/beep
-
-setuid:
-	sudo chown root sys-mon
-	sudo chmod 4775 sys-mon
 
 clean:
 	rm -f *.o a.out */*.o simple-client sys-mon genmon/genmon
