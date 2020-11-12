@@ -2,13 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/fcntl.h>
-#include <sys/mman.h>
 #include <unistd.h>
 
 #include "../read_buffer.h"
 #include "../shared_buf.h"
 #include "../writter.h"
+#include "../client/client.h"
 
 #define GENMON_STR_SIZE 512
 
@@ -55,39 +54,16 @@ void append_uint(unsigned int x) {
 }
 
 int main() {
-    int shm_fd = shm_open("/sys-mon", O_RDWR, 0);
-    if (shm_fd == -1) {
-        perror("opening shm [sys-mon] failed");
-        exit(-1);
-    }
+    sys_mon_handle_t *sys_mon = sys_mon_open("sys-mon-0");
 
-    struct shared_buf* sh_buf = mmap(NULL, sizeof(struct shared_buf),
-                                     PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-
-    if (sh_buf == MAP_FAILED) {
-        perror("shm map failed");
-        exit(-1);
-    }
-
-    sem_post(&sh_buf->in);
-    sem_wait(&sh_buf->out);
-    munmap(sh_buf, sizeof(struct shared_buf));
+    char buffer[512];
+    sys_mon_read_data(sys_mon, buffer, 512);
+    sys_mon_close(sys_mon);
 
     unsigned int cpu_usage, core_0, core_1, mem_total, mem_mb, t1, t2, freq_0, freq_1, sda_rb, sda_wb, sdb_rb, sdb_wb;
-    read_next_uint(shm_fd, &cpu_usage);
-    read_next_uint(shm_fd, &core_0);
-    read_next_uint(shm_fd, &core_1);
-    read_next_uint(shm_fd, &mem_total);
-    read_next_uint(shm_fd, &mem_mb);
-    read_next_uint(shm_fd, &t1);
-    read_next_uint(shm_fd, &t2);
-    read_next_uint(shm_fd, &freq_0);
-    read_next_uint(shm_fd, &freq_1);
-    read_next_uint(shm_fd, &sda_rb);
-    read_next_uint(shm_fd, &sda_wb);
-    read_next_uint(shm_fd, &sdb_rb);
-    read_next_uint(shm_fd, &sdb_wb);
-    close(shm_fd);
+    sscanf(buffer, "%d%d%d%d%d%d%d%d%d%d%d%d%d",
+        &cpu_usage, &core_0, &core_1, &mem_total, &mem_mb, &t1, &t2, &freq_0, &freq_1, &sda_rb, &sda_wb, &sdb_rb, &sdb_wb
+    );
 
     int max_temp = t1 > t2 ? t1 : t2;
 

@@ -1,32 +1,67 @@
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200112L
 #include <dlfcn.h>
 #include <semaphore.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
-#include <string.h>
 
-#include "read_buffer.h"
-#include "writter.h"
+#include "error.h"
 #include "module.h"
+#include "read_buffer.h"
 #include "shared_buf.h"
+#include "writter.h"
 
 #define MAX_CONF_LINE_SIZE 256
 #ifndef MAX_MODULES
 #define MAX_MODULES 32
 #endif
-module_config modules[MAX_MODULES];
-static int modules_n = 0;
 
-void init_modules(const char* config_path) {
+static timer_t sys_mon_timer;
+static module_config modules[MAX_MODULES];
+static int modules_n = 0;
+static struct shared_buf* sh_buf;
+writter_t wr;
+
+struct module_config_spec {
+    const char* module_name;
+    const char* module_args;
+};
+
+typedef struct module_config_spec module_config_spec_t;
+
+struct sys_mon_config {
+    bool auto_update;
+    int update_ms;
+    const char* shm_name;
+};
+
+typedef struct sys_mon_config sys_mon_config_t;
+
+char shm_name_buff[32] = "sys-mon";
+
+sys_mon_config_t sys_mon_config = {
+    .auto_update = false,
+    .shm_name = shm_name_buff};
+
+void section_config(FILE* conf, const char* section_line);
+
+void parse_modules_config(FILE* conf) {
     memptr_t dl = dlopen(NULL, RTLD_LAZY);
-    FILE * conf = fopen(config_path, "r");
     char line[MAX_CONF_LINE_SIZE + 1];
     while (fgets(line, MAX_CONF_LINE_SIZE + 1, conf) != NULL) {
+        if (line[0] == '[') {
+            section_config(conf, line);
+            return;
+        }
+
         if (modules_n == MAX_MODULES) {
             fprintf(stderr, "too many modules in config\n");
             exit(-1);
@@ -53,31 +88,111 @@ void init_modules(const char* config_path) {
     fclose(conf);
 }
 
-static const char* shm_name = "/sys-mon";
+void parse_sys_mon_config(FILE* conf) {
+    char line[MAX_CONF_LINE_SIZE + 1];
+    while (fgets(line, MAX_CONF_LINE_SIZE + 1, conf) != NULL) {
+        if (line[0] == '[') {
+            section_config(conf, line);
+            return;
+        }
+        char* asign = strchr(line, '=');
+        if (!asign)
+            exit_with_error("invalid conf line:%s\n", line);
+        *asign = ' ';
+
+        char param[16], value[128];
+
+        if (sscanf(line, "%16s %128s", param, value) != 2)
+            exit_with_error("invalid conf line:%s\n", line);
+
+        if (!strcmp(param, "auto_update")) {
+            if (!strcmp(value, "true"))
+                sys_mon_config.auto_update = true;
+            else if (!strcmp(value, "false"))
+                sys_mon_config.auto_update = false;
+            else
+                exit_with_error("invalid conf line:%s\n", line);
+        } else if (!strcmp(param, "update_ms")) {
+            sys_mon_config.update_ms = atoi(value);
+        } else if (!strcmp(param, "name")) {
+            if (strlen(value) > sizeof(shm_name_buff) - 1)
+                exit_with_error("invalid conf line:%s\n", line);
+            strcpy(shm_name_buff, value);
+        } else {
+            exit_with_error("invalid conf line: %s\n", line);
+        }
+    }
+}
+
+void section_config(FILE* conf, const char* section_line) {
+    static const int max_section_name_len = 15;
+    const char* start = strchr(section_line, '[');
+    const char* end = strchr(section_line, ']');
+    if (start == NULL || end == NULL)
+        exit_with_error("invalid line: %s", section_line);
+
+    start++;
+    int name_len = end - start;
+    if (name_len > max_section_name_len)
+        exit_with_error("invalid line: %s", section_line);
+
+    char section_name[16];
+    memcpy(section_name, start, name_len);
+    section_name[name_len] = 0;
+
+    if (!strcmp(section_name, "sys-mon")) {
+        parse_sys_mon_config(conf);
+        return;
+    } else if (!strcmp(section_name, "modules")) {
+        parse_modules_config(conf);
+        return;
+    } else
+        exit_with_error("invalid line: %s", section_line);
+}
+
 static int shm_fd;
 
 static void handle_signal(int sig) {
     switch (sig) {
         case SIGTERM:
         case SIGINT:
-            shm_unlink(shm_name);
+            shm_unlink(sys_mon_config.shm_name);
             close(shm_fd);
             exit(0);
             break;
     }
 }
 
-int main(int argc, char *argv[]) {
+void parse_config(const char* path) {
+    FILE* conf = fopen(path, "r");
+    if (!conf)
+        exit_with_error("unable to open config");
+    parse_sys_mon_config(conf);
+}
+
+void update() {
+    wr.pos = 0;
+    for (int i = 0; i < modules_n; i++) {
+        modules[i].write_data(modules[i].data, &wr);
+        write_char(&wr, '\n');
+    }
+    if (write_char(&wr, 0) == -1) {
+        fprintf(stderr, "not enough shm space\n");
+        raise(SIGTERM);
+    }
+}
+
+int main(int argc, char* args[]) {
     signal(SIGTERM, handle_signal);
     signal(SIGINT, handle_signal);
 
-    if (argc < 2) {
-            fprintf(stderr, "missing file path\n");
-            exit(-1);
-    }
-    init_modules(argv[1]);
+    if (argc < 2)
+        exit_with_error("missing file path\n");
+
+    parse_config(args[1]);
+
     mode_t old_umask = umask(0);
-    int shm_fd = shm_open(shm_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IROTH);
+    int shm_fd = shm_open(sys_mon_config.shm_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IROTH);
     umask(old_umask);
 
     if (shm_fd == -1) {
@@ -89,30 +204,48 @@ int main(int argc, char *argv[]) {
         perror("ftruncate failed");
         exit(-1);
     }
-    struct shared_buf* sh_buf = mmap(NULL, sizeof(struct shared_buf),
-                                     PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    sh_buf = mmap(NULL, sizeof(struct shared_buf),
+                  PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
     if (sh_buf == MAP_FAILED) {
         perror("map failed");
         exit(-1);
     }
 
-    sem_init(&sh_buf->in, 1, 0);
-    sem_init(&sh_buf->out, 1, 0);
+    wr = (writter_t){.buffer = sh_buf->data, .len = SHARED_SIZE, .pos = 0};
 
-    writter_t wr = {.buffer = sh_buf->data, .len = SHARED_SIZE, .pos = 0};
-    while (true) {
-        sem_wait(&sh_buf->in);
-        wr.pos = 0;
-        for (int i = 0; i < modules_n; i++) {
-            modules[i].write_data(modules[i].data, &wr);
-            write_char(&wr, '\n');
+    if (sys_mon_config.auto_update == false) {
+        sh_buf->sync_method = SYS_MON_SYNC_IP_WO_R;
+        sem_init(&sh_buf->in, 1, 0);
+        sem_init(&sh_buf->out, 1, 0);
+        while (true) {
+            sem_wait(&sh_buf->in);
+            update();
+            sem_post(&sh_buf->out);
         }
-        if (write_char(&wr, 0) == -1) {
-            fprintf(stderr, "not enough shm space\n");
-            raise(SIGTERM);
-        }
+    } else {
+        sh_buf->sync_method = SYS_MON_SYNC_WP_R_OP;
+        sem_init(&sh_buf->in, 1, 1);
+        timer_create(CLOCK_MONOTONIC, NULL, &sys_mon_timer);
 
-        sem_post(&sh_buf->out);
+        long nanos = (sys_mon_config.update_ms % 1000) * 1000 * 1000;
+        struct itimerspec time_spec = {
+            .it_interval = {.tv_sec = sys_mon_config.update_ms / 1000, .tv_nsec = nanos},
+            .it_value = {.tv_sec = sys_mon_config.update_ms / 1000, .tv_nsec = nanos}};
+
+        sigset_t sigset;
+        sigemptyset(&sigset);
+        sigaddset(&sigset, SIGALRM);
+        sigprocmask(SIG_BLOCK, &sigset, NULL);
+
+        timer_settime(sys_mon_timer, 0, &time_spec, NULL);
+
+        while (true) {
+            int sig;
+            sigwait(&sigset, &sig);
+            sem_wait(&sh_buf->in);
+            update();
+            sem_post(&sh_buf->in);
+        }
     }
 }

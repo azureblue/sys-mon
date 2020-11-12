@@ -1,5 +1,8 @@
 *.o
 *.so
+*.a
+*.lo
+subjson
 sys-mon
 simple-client
 genmon/genmon
