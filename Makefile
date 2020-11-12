@@ -1,5 +1,5 @@
-#CFLAGS= -O3 -std=c11  -fno-stack-protector
-CFLAGS= -g -std=c11  -fno-stack-protector
+CFLAGS= -O3 -flto -std=c11  -fno-stack-protector
+#CFLAGS= -g -std=c11  -fno-stack-protector
 
 SRCS=$(wildcard *.c) $(wildcard modules/*.c)
 OBJS=$(SRCS:.c=.o)
@@ -8,10 +8,10 @@ OBJS_GENMON=genmon/genmon.o read_buffer.o writter.o
 OBJS_BEEP=genmon/beep.o
 
 %.o : %.c
-	gcc -c -D_POSIX_C_SOURCE=200112L -rdynamic $(CFLAGS) $< -o $@
+	gcc -c -rdynamic $(CFLAGS) $< -o $@
 
 %.lo : %.c
-	gcc -fPIC -c -D_POSIX_C_SOURCE=200112L -rdynamic $(CFLAGS) $< -o $@
+	gcc -fPIC -c  -rdynamic $(CFLAGS) $< -o $@
 
 sys-mon: $(OBJS)
 	gcc $(CFLAGS) --whole-file -rdynamic $(OBJS) -lrt -lpthread -ldl -o sys-mon
@@ -23,7 +23,7 @@ client: client/client.lo
 simple-client: client/simple-client.o client
 	gcc $(CFLAGS) client/simple-client.c client.a -lrt -lpthread -o simple-client
 
-genmon: $(OBJS_GENMON)
+genmon: $(OBJS_GENMON) client
 	gcc $(CFLAGS) $(OBJS_GENMON) client.a -o genmon/genmon -lrt -lpthread
 
 beep: $(OBJS_BEEP)
@@ -32,4 +32,4 @@ beep: $(OBJS_BEEP)
 	sudo chmod 4775 genmon/beep
 
 clean:
-	rm -f *.o a.out */*.o simple-client sys-mon genmon/genmon
+	rm -f *.o a.out */*.o */*.a */*.lo simple-client sys-mon genmon/genmon client.a

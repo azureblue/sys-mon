@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700
-#define _POSIX_C_SOURCE 200112L
+#define _POSIX_C_SOURCE 200809L
 #include <dlfcn.h>
+#include <errno.h>
 #include <semaphore.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -212,12 +213,26 @@ int main(int argc, char* args[]) {
         exit(-1);
     }
 
+    pthread_mutexattr_t mattr;
+    pthread_mutexattr_init(&mattr);
+    pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+    pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST);
+    pthread_mutex_init(&sh_buf->mutex, &mattr);
+    pthread_mutexattr_destroy(&mattr);
+    // pthread_condattr_t cattr;
+    // pthread_condattr_init(&cattr);
+    // pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
+    // pthread_cond_init(&sh_buf->cond, &cattr);
+    // pthread_condattr_destroy(&cattr);
+
     wr = (writter_t){.buffer = sh_buf->data, .len = SHARED_SIZE, .pos = 0};
 
     if (sys_mon_config.auto_update == false) {
         sh_buf->sync_method = SYS_MON_SYNC_IP_WO_R;
+
         sem_init(&sh_buf->in, 1, 0);
         sem_init(&sh_buf->out, 1, 0);
+
         while (true) {
             sem_wait(&sh_buf->in);
             update();
@@ -243,9 +258,11 @@ int main(int argc, char* args[]) {
         while (true) {
             int sig;
             sigwait(&sigset, &sig);
-            sem_wait(&sh_buf->in);
+            int lock_res = pthread_mutex_lock(&sh_buf->mutex);
+            if (lock_res == EOWNERDEAD)
+                pthread_mutex_consistent(&sh_buf->mutex);
             update();
-            sem_post(&sh_buf->in);
+            pthread_mutex_unlock(&sh_buf->mutex);
         }
     }
 }
