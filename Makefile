@@ -1,5 +1,5 @@
 CFLAGS= -O3 -flto -std=c11  -fno-stack-protector
-#CFLAGS= -g -std=c11  -fno-stack-protector
+# CFLAGS= -g -std=c11  -fno-stack-protector
 
 SRCS=$(wildcard *.c) $(wildcard modules/*.c)
 OBJS=$(SRCS:.c=.o)

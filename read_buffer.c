@@ -94,7 +94,37 @@ read_result_t next_line(int fd) {
     }
 }
 
-int skip_next(int fd) {
+read_result_t read_next_string(int fd, char *dst, int n) {
+    read_result_t res_code = skip_whitespaces(fd);
+
+   if (res_code != read_result_ok)
+        return res_code;
+
+    if (n == 0)
+        return read_result_error;
+    n--;
+
+    while (true) {
+        for (; pos < filled; pos++) {
+            if (is_whitespace(buffer[pos]) || !(n--)) {
+                *dst = 0;
+                return read_result_ok;
+            }
+            *dst++ = buffer[pos];
+        }
+
+        read_result_t fill_result = fill_buffer(fd);
+        if (fill_result != read_result_ok) {
+            if (fill_result == read_result_eof) {
+                *dst = 0;
+                return read_result_ok;
+            }
+            return fill_result;
+        }
+    }
+}
+
+read_result_t skip_next(int fd) {
    read_result_t res_code = skip_whitespaces(fd);
    if (res_code != read_result_ok)
         return res_code;

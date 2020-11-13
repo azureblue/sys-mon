@@ -6,9 +6,13 @@
 
 #include "client.h"
 
-int main() {
+int main(int argc, char ** args) {
     char buffer[512];
-    sys_mon_handle_t *sys_mon = sys_mon_open("sys-mon-0");
+    if (argc < 2) {
+        fprintf(stderr, "missing name");
+        exit(-1);
+    }
+    sys_mon_handle_t *sys_mon = sys_mon_open(args[1]);
 
     sys_mon_read_data(sys_mon, buffer, 512);
     printf("%s", buffer);

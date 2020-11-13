@@ -13,7 +13,7 @@ struct module_config {
     module_data data;
 };
 
-typedef struct module_config module_config;
-typedef module_config (*module_init)(char * module_args);
+typedef struct module_config module_config_t;
+typedef module_config_t (*module_init)(const char * module_args);
 
 #endif

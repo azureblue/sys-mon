@@ -8,6 +8,8 @@
 
 #include "../module.h"
 #include "../read_buffer.h"
+#include "../string_utils.h"
+#include "../error.h"
 
 bool startsWith(const char *a, const char *b)
 {
@@ -77,22 +79,19 @@ static int write_data(module_data data, writter_t *wr) {
     return 0;
 }
 
-struct module_config module_init_cpu(char *args) {
-    struct module_config config;
+module_config_t module_init_cpu(const char *args) {
     int fd = open("/proc/stat", O_RDONLY);
-    if (fd == -1) {
-        perror("cpu usage module init failed");
-        exit(-1);
-    }
-    if (args == NULL) {
-       fprintf(stderr, "cpu module init failed: need argument\n");
-       exit(-1);
-    }
+
+    if (fd == -1)
+        exit_with_perror("cpu usage module init failed");
+
+    if (args == NULL || string_is_empty(args))
+       args = "0";
 
     int cores;
     sscanf(args, "%d", &cores);
     cores++;
-
+    module_config_t config;
     config.data = calloc(1, sizeof(cpu_data_t) + sizeof(core_data_t) * cores);
     ((cpu_data_t *)config.data)->fd = fd;
     ((cpu_data_t *)config.data)->cores = cores;

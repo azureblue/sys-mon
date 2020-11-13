@@ -11,3 +11,4 @@ read_result_t read_init(int fd);
 read_result_t read_next_uint(int fd, unsigned int *out);
 read_result_t next_line(int fd);
 read_result_t skip_next(int fd);
+read_result_t read_next_string(int fd, char *dst, int n);

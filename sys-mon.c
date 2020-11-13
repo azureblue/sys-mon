@@ -18,6 +18,7 @@
 #include "module.h"
 #include "read_buffer.h"
 #include "shared_buf.h"
+#include "string_utils.h"
 #include "writter.h"
 
 #define MAX_CONF_LINE_SIZE 256
@@ -26,7 +27,7 @@
 #endif
 
 static timer_t sys_mon_timer;
-static module_config modules[MAX_MODULES];
+static module_config_t modules[MAX_MODULES];
 static int modules_n = 0;
 static struct shared_buf* sh_buf;
 writter_t wr;
@@ -58,31 +59,31 @@ void parse_modules_config(FILE* conf) {
     memptr_t dl = dlopen(NULL, RTLD_LAZY);
     char line[MAX_CONF_LINE_SIZE + 1];
     while (fgets(line, MAX_CONF_LINE_SIZE + 1, conf) != NULL) {
+        if (string_is_empty(line))
+            continue;
         if (line[0] == '[') {
             section_config(conf, line);
             return;
         }
 
-        if (modules_n == MAX_MODULES) {
-            fprintf(stderr, "too many modules in config\n");
-            exit(-1);
-        }
-        if (strlen(line) > MAX_CONF_LINE_SIZE) {
-            fprintf(stderr, "invalid conf file, line too long\n");
-            exit(-1);
-        }
+        if (modules_n == MAX_MODULES)
+            exit_with_error("too many modules in config");
+
+        if (strlen(line) > MAX_CONF_LINE_SIZE)
+            exit_with_error("invalid conf file, line too long");
+
         char module_name[32];
-        if (sscanf(line, "%31s", module_name) != 1) {
-            fprintf(stderr, "invalid config line: %d\n", modules_n + 1);
-            exit(-1);
-        }
+        if (sscanf(line, "%31s", module_name) != 1)
+            exit_with_error("invalid config line: %d", modules_n + 1);
+
         char module_init_name[50] = "module_init_";
         strcat(module_init_name, module_name);
+
         module_init init = dlsym(dl, module_init_name);
-        if (init == NULL) {
-            fprintf(stderr, "can't load module %s: %s\n", module_name, dlerror());
-            exit(-1);
-        }
+
+        if (init == NULL)
+            exit_with_error("can't load module %s: %s", module_name, dlerror());
+
         modules[modules_n] = init(line + strlen(module_name));
         modules_n++;
     }
@@ -92,6 +93,8 @@ void parse_modules_config(FILE* conf) {
 void parse_sys_mon_config(FILE* conf) {
     char line[MAX_CONF_LINE_SIZE + 1];
     while (fgets(line, MAX_CONF_LINE_SIZE + 1, conf) != NULL) {
+        if (string_is_empty(line))
+            continue;
         if (line[0] == '[') {
             section_config(conf, line);
             return;
@@ -187,10 +190,8 @@ int main(int argc, char* args[]) {
     signal(SIGTERM, handle_signal);
     signal(SIGINT, handle_signal);
 
-    if (argc < 2)
-        exit_with_error("missing file path\n");
-
-    parse_config(args[1]);
+    char *config_path = argc < 2 ? "./default.conf" : args[1];
+    parse_config(config_path);
 
     mode_t old_umask = umask(0);
     int shm_fd = shm_open(sys_mon_config.shm_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IROTH);

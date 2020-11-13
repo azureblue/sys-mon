@@ -4,12 +4,14 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../client/client.h"
 #include "../read_buffer.h"
 #include "../shared_buf.h"
 #include "../writter.h"
-#include "../client/client.h"
 
 #define GENMON_STR_SIZE 512
+
+const char* sys_mon_name = "sys-mon-genmon";
 
 const char* progress_bar_blocks[] = {" ", "\xE2\x96\x81", "\xE2\x96\x82", "\xE2\x96\x83", "\xE2\x96\x84", "\xE2\x96\x85", "\xE2\x96\x86", "\xE2\x96\x87", "\xE2\x96\x87"};
 const int progress_bar_blocks_len = 9;
@@ -54,7 +56,7 @@ void append_uint(unsigned int x) {
 }
 
 int main() {
-    sys_mon_handle_t *sys_mon = sys_mon_open("sys-mon-0");
+    sys_mon_handle_t* sys_mon = sys_mon_open(sys_mon_name);
 
     char buffer[512];
     sys_mon_read_data(sys_mon, buffer, 512);
@@ -62,8 +64,7 @@ int main() {
 
     unsigned int cpu_usage, core_0, core_1, mem_total, mem_mb, t1, t2, freq_0, freq_1, sda_rb, sda_wb, sdb_rb, sdb_wb;
     sscanf(buffer, "%d%d%d%d%d%d%d%d%d%d%d%d%d",
-        &cpu_usage, &core_0, &core_1, &mem_total, &mem_mb, &t1, &t2, &freq_0, &freq_1, &sda_rb, &sda_wb, &sdb_rb, &sdb_wb
-    );
+           &cpu_usage, &core_0, &core_1, &mem_total, &mem_mb, &t1, &t2, &freq_0, &freq_1, &sda_rb, &sda_wb, &sdb_rb, &sdb_wb);
 
     int max_temp = t1 > t2 ? t1 : t2;
 

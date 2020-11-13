@@ -3,9 +3,11 @@
 #include <string.h>
 #include <sys/fcntl.h>
 #include <unistd.h>
+
+#include "../error.h"
+#include "../module.h"
 #include "../read_buffer.h"
 #include "../writter.h"
-#include "../module.h"
 
 static const int R_RQS = 1 << 0, R_MERGES = 1 << 1, R_SECTORS = 1 << 2, R_TICKS = 1 << 3,
                  W_RQS = 1 << 4, W_MERGES = 1 << 5, W_SECTORS = 1 << 6, W_TICKS = 1 << 7;
@@ -16,9 +18,9 @@ struct disk_activity_data {
     unsigned int data[8];
 };
 
-typedef struct disk_activity_data disk_activity_data;
+typedef struct disk_activity_data disk_activity_data_t;
 
-static int update_data(disk_activity_data *disk_data) {
+static int update_data(disk_activity_data_t *disk_data) {
     int fd = disk_data->fd;
     lseek(fd, 0, SEEK_SET);
     read_init(fd);
@@ -33,8 +35,8 @@ static int update_data(disk_activity_data *disk_data) {
 }
 
 static int write_data(module_data data, writter_t *wr) {
-    disk_activity_data *disk_data = data;
-    disk_activity_data old = *disk_data;
+    disk_activity_data_t *disk_data = data;
+    disk_activity_data_t old = *disk_data;
     update_data(disk_data);
     unsigned int flags = disk_data->flags;
     for (int i = 0; i < 8; i++) {
@@ -47,18 +49,17 @@ static int write_data(module_data data, writter_t *wr) {
     return 0;
 }
 
-struct module_config module_init_disk_activity(char *args) {
+module_config_t module_init_disk_activity(const char *args) {
     int flags = 0;
     char path[128];
     char arg[64];
     int n = 0, idx = 0, count = 0;
-    if (sscanf(args + (idx += n), "%63s%n", arg, &n) != 1) {
-        fprintf(stderr, "disk module init failed: too few args\n");
-        exit(-1);
-    }
+
+    if (sscanf(args + (idx += n), "%63s%n", arg, &n) != 1)
+        exit_with_error("disk module init failed: too few args");
 
     sprintf(path, "/sys/block/%s/stat", arg);
-    while(sscanf(args + (idx += n), "%63s%n", arg, &n) == 1) {
+    while (sscanf(args + (idx += n), "%63s%n", arg, &n) == 1) {
         if (!strcmp(arg, "r_sectors"))
             flags |= R_SECTORS;
         else if (!strcmp(arg, "w_sectors"))
@@ -75,25 +76,21 @@ struct module_config module_init_disk_activity(char *args) {
             flags |= R_TICKS;
         else if (!strcmp(arg, "w_ticks"))
             flags |= W_TICKS;
-        else {
-            fprintf(stderr, "disk module init failed: invalid argument: %s\n", arg);
-            exit(-1);
-        }
+        else
+            exit_with_error("disk module init failed: invalid argument: %s\n", arg);
     }
 
-    if (flags == 0) {
-        fprintf(stderr, "disk module init failed: too few args\n");
-        exit(-1);
-    }
-    struct module_config config;
+    if (!flags)
+        exit_with_error("disk module init failed: too few args");
+
     int fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        perror("disk module init failed");
-        exit(-1);
-    }
-    config.data = calloc(1, sizeof(disk_activity_data) + 5);
-    ((disk_activity_data *) config.data)->fd = fd;
-    ((disk_activity_data *) config.data)->flags = flags;
+    if (fd == -1)
+        exit_with_perror("disk module init failed");
+
+    module_config_t config;
+    config.data = calloc(1, sizeof(disk_activity_data_t) + 5);
+    ((disk_activity_data_t *)config.data)->fd = fd;
+    ((disk_activity_data_t *)config.data)->flags = flags;
     update_data(config.data);
     config.write_data = write_data;
     return config;

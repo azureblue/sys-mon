@@ -5,6 +5,7 @@
 #include <sys/fcntl.h>
 #include "../module.h"
 #include "../read_buffer.h"
+#include "../error.h"
 
 struct gen_data {
     int fd;
@@ -25,21 +26,20 @@ static int write_data(module_data data, writter_t *wr) {
     return write_uint(wr, value);
 }
 
-struct module_config module_init_generic(char *args) {
+module_config_t module_init_generic(const char *args) {
     char path[128];
     int div;
     if (sscanf(args, "%s %d", path, &div) != 2) {
         perror("generic module: too few arguments");
         exit(-1);
     }
-    struct module_config config;
     int fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        perror("generic module: init failed");
-        exit(-1);
-    }
+    if (fd == -1)
+        exit_with_perror("generic module: init failed");
+
+    module_config_t config;
     config.write_data = write_data;
-    config.data = calloc(1, sizeof (struct gen_data) + strlen(path) + 1);
+    config.data = calloc(1, sizeof (gen_data_t) + strlen(path) + 1);
     strcpy(((gen_data_t *)config.data)->source_desc, path);
     ((gen_data_t *)config.data)->fd = fd;
     ((gen_data_t *)config.data)->div = div;
