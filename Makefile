@@ -15,7 +15,7 @@ OBJS_BEEP=genmon/beep.o
 
 sys-mon: $(OBJS)
 	gcc $(CFLAGS) --whole-file -rdynamic $(OBJS) -lrt -lpthread -ldl -o sys-mon
-	#strip sys-mon
+	strip -sx sys-mon
 
 client: client/client.lo
 	ar rcs client.a client/client.lo
@@ -25,6 +25,7 @@ simple-client: client/simple-client.o client
 
 genmon: $(OBJS_GENMON) client
 	gcc $(CFLAGS) $(OBJS_GENMON) client.a -o genmon/genmon -lrt -lpthread
+	strip -sx genmon/genmon
 
 beep: $(OBJS_BEEP)
 	gcc $(CFLAGS) $(OBJS_BEEP) -o genmon/beep
