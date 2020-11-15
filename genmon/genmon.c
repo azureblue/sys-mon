@@ -84,7 +84,12 @@ int main() {
     sscanf(buffer, "%d%d%d%d%d%d%d%d%d%d%d%d",
            &cpu_usage, &core_0, &core_1, &mem_mb, &t1, &t2, &freq_0, &freq_1, &sda_rb, &sda_wb, &sdb_rb, &sdb_wb);
 
+    freq_0 /= 1000;
+    freq_0 /= 1000;
     int max_temp = t1 > t2 ? t1 : t2;
+    max_temp /= 1000;
+    mem_mb /= 1000;
+
 
     if (mem_mb < 200) {
         system("pkill chrom");

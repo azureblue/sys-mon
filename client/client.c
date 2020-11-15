@@ -23,7 +23,7 @@ sys_mon_handle_t* sys_mon_open(const char* name) {
     sys_mon_handle_t* handle = malloc(sizeof(sys_mon_handle_t));
     int shm_fd = shm_open(name, O_RDWR, 0);
     if (shm_fd == -1) {
-        perror("opening shm [sys-mon] failed");
+        perror("opening shm sys-mon failed");
         exit(-1);
     }
 

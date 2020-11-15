@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +14,7 @@
 
 struct ram_data {
     int fd;
-    int flags;
+    uint32_t lines_bitset;
 };
 
 typedef struct ram_data ram_data;
@@ -31,21 +32,23 @@ typedef enum mem_info_key mem_info_key_t;
 #define mem_info_key_size 5
 int line_numbers[mem_info_key_size] = {-1};
 
+const uint32_t F_CHANGE = 1 << 31;
+
 static int write_data(module_data data, writter_t *wr) {
+    char buf[16];
     ram_data *mem_data = data;
     int fd = mem_data->fd;
-    int flags = mem_data->flags;
+    uint32_t lines_bitset = mem_data->lines_bitset;
     lseek(fd, 0, SEEK_SET);
     read_init(fd);
-    while (flags) {
-        if (flags & 1) {
-            int value;
+    while (lines_bitset) {
+        if (lines_bitset & 1) {
             skip_next(fd);
-            read_next_uint(fd, &value);
-            write_uint(wr, value / 1000);
+            read_next_string(fd, buf, 16);
+            write_string(wr, buf);
             write_char(wr, ' ');
         }
-        flags >>= 1;
+        lines_bitset >>= 1;
         next_line(fd);
     }
 }
@@ -87,6 +90,7 @@ module_config_t module_init_ram(const char *args) {
 
     int flags = 0;
     int n = 0, idx = 0, count = 0;
+    uint32_t bytes_divisor;
 
     while(sscanf(args + (idx += n), "%63s%n", arg, &n) == 1) {
         if (string_starts_with("total", arg))
@@ -100,12 +104,12 @@ module_config_t module_init_ram(const char *args) {
         else if (string_starts_with("cached", arg))
             flags |= 1 << check_key(mem_info_key_cached, "cached");
         else
-            exit_with_error("disk module init failed: invalid argument: %s\n", arg);
+            exit_with_error("module [ram] init failed: invalid argument: %s\n", arg);
     }
     module_config_t config;
     config.data = calloc(1, sizeof(ram_data));
     ((ram_data *)config.data)->fd = fd;
-    ((ram_data *)config.data)->flags = flags;
+    ((ram_data *)config.data)->lines_bitset = flags;
     config.write_data = write_data;
     return config;
 }

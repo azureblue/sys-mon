@@ -2,6 +2,7 @@
 *.so
 *.a
 *.lo
+test.conf
 subjson
 sys-mon
 simple-client

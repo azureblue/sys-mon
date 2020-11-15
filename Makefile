@@ -13,7 +13,7 @@ OBJS_BEEP=genmon/beep.o
 %.lo : %.c
 	gcc -fPIC -c  -rdynamic $(CFLAGS) $< -o $@
 
-sys-mon: $(OBJS)
+sys-mon: $(OBJS) simple-client
 	gcc $(CFLAGS) --whole-file -rdynamic $(OBJS) -lrt -lpthread -ldl -o sys-mon
 	strip -sx sys-mon
 
