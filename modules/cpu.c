@@ -42,15 +42,15 @@ typedef struct cpu_data cpu_data_t;
 static int update_data(cpu_data_t *data) {
     int fd = data->fd;
     lseek(fd, 0, SEEK_SET);
-    read_init(fd);
+    read_start(fd);
 
     for (int i = 0; i < data->cores; i++) {
         int user, nice, sys, idle;
         skip_next(fd);
-        read_next_uint(fd, &user);
-        read_next_uint(fd, &nice);
-        read_next_uint(fd, &sys);
-        read_next_uint(fd, &idle);
+        read_next_uint(&user);
+        read_next_uint(&nice);
+        read_next_uint(&sys);
+        read_next_uint(&idle);
 
         int sum = user + nice + sys + idle;
         data->core_data[i].diff_sum = sum - data->core_data[i].sum;

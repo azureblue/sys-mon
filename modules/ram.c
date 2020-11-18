@@ -40,11 +40,11 @@ static int write_data(module_data data, writter_t *wr) {
     int fd = mem_data->fd;
     uint32_t lines_bitset = mem_data->lines_bitset;
     lseek(fd, 0, SEEK_SET);
-    read_init(fd);
+    read_start(fd);
     while (lines_bitset) {
         if (lines_bitset & 1) {
             skip_next(fd);
-            read_next_string(fd, buf, 16);
+            read_next_string(buf, 16);
             write_string(wr, buf);
             write_char(wr, ' ');
         }
@@ -69,9 +69,9 @@ module_config_t module_init_ram(const char *args) {
 
     char arg[64];
     int line = 0;
-    read_init(fd);
+    read_start(fd);
     while (true) {
-        if (read_next_string(fd, arg, 64) == read_result_eof)
+        if (read_next_string(arg, 64) == read_result_eof)
             break;
         if (string_starts_with(arg, "MemTotal"))
             line_numbers[mem_info_key_total] = line;

@@ -17,7 +17,7 @@ static const uint32_t R_RQS = 1 << 0, R_MERGES = 1 << 1, R_SECTORS = 1 << 2, R_T
 
 struct disk_activity_data {
     int fd;
-    uint32_t lines_bitset;
+    uint32_t fields_bitset;
     bool change_only;
     uint32_t data[8];
 };
@@ -27,20 +27,20 @@ typedef struct disk_activity_data disk_activity_data_t;
 static int update_data(disk_activity_data_t *disk_data) {
     int fd = disk_data->fd;
     lseek(fd, 0, SEEK_SET);
-    read_init(fd);
-    uint32_t lines_bitset = disk_data->lines_bitset;
+    read_start(fd);
+    uint32_t fields_bitset = disk_data->fields_bitset;
     for (int i = 0; i < 8; i++) {
-        if (lines_bitset & 1)
-            read_next_uint(fd, &disk_data->data[i]);
+        if (fields_bitset & 1)
+            read_next_uint(&disk_data->data[i]);
         else
             skip_next(fd);
-        lines_bitset >>= 1;
+        fields_bitset >>= 1;
     }
 }
 
 static int write_data(module_data data, writter_t *wr) {
     disk_activity_data_t *disk_data = data;
-    uint32_t lines_bitset = disk_data->lines_bitset;
+    uint32_t lines_bitset = disk_data->fields_bitset;
     disk_activity_data_t old = *disk_data;
     update_data(disk_data);
     bool relative = disk_data->change_only;
@@ -59,7 +59,7 @@ static int write_data(module_data data, writter_t *wr) {
 }
 
 module_config_t module_init_disk_activity(const char *args) {
-    uint32_t lines_bitset = 0;
+    uint32_t fields_bitset = 0;
     bool change_only = true;
     char path[128];
     char arg[64];
@@ -73,26 +73,26 @@ module_config_t module_init_disk_activity(const char *args) {
         if (!strcmp(arg, "total"))
             change_only = false;
         else if (!strcmp(arg, "r_sectors"))
-            lines_bitset |= R_SECTORS;
+            fields_bitset |= R_SECTORS;
         else if (!strcmp(arg, "w_sectors"))
-            lines_bitset |= W_SECTORS;
+            fields_bitset |= W_SECTORS;
         else if (!strcmp(arg, "r_reqs"))
-            lines_bitset |= R_RQS;
+            fields_bitset |= R_RQS;
         else if (!strcmp(arg, "w_reqs"))
-            lines_bitset |= W_RQS;
+            fields_bitset |= W_RQS;
         else if (!strcmp(arg, "r_merges"))
-            lines_bitset |= R_MERGES;
+            fields_bitset |= R_MERGES;
         else if (!strcmp(arg, "w_merges"))
-            lines_bitset |= W_MERGES;
+            fields_bitset |= W_MERGES;
         else if (!strcmp(arg, "r_ticks"))
-            lines_bitset |= R_TICKS;
+            fields_bitset |= R_TICKS;
         else if (!strcmp(arg, "w_ticks"))
-            lines_bitset |= W_TICKS;
+            fields_bitset |= W_TICKS;
         else
             exit_with_error("disk module init failed: invalid argument: %s\n", arg);
     }
 
-    if (!lines_bitset)
+    if (!fields_bitset)
         exit_with_error("disk module init failed: too few args");
 
     int fd = open(path, O_RDONLY);
@@ -102,7 +102,7 @@ module_config_t module_init_disk_activity(const char *args) {
     module_config_t config;
     config.data = calloc(1, sizeof(disk_activity_data_t));
     ((disk_activity_data_t *)config.data)->fd = fd;
-    ((disk_activity_data_t *)config.data)->lines_bitset = lines_bitset;
+    ((disk_activity_data_t *)config.data)->fields_bitset = fields_bitset;
     ((disk_activity_data_t *)config.data)->change_only = change_only;
     update_data(config.data);
     config.write_data = write_data;

@@ -1,3 +1,4 @@
+#include <inttypes.h>
 
 enum read_result {
     read_result_ok = 0,
@@ -7,8 +8,9 @@ enum read_result {
 
 typedef enum read_result read_result_t;
 
-read_result_t read_init(int fd);
-read_result_t read_next_uint(int fd, unsigned int *out);
-read_result_t next_line(int fd);
-read_result_t skip_next(int fd);
-read_result_t read_next_string(int fd, char *dst, int n);
+read_result_t read_start();
+read_result_t read_next_uint(unsigned int *out);
+read_result_t read_next_int64(uint64_t *out);
+read_result_t next_line();
+read_result_t skip_next();
+read_result_t read_next_string(char *dst, int n);

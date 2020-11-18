@@ -10,6 +10,8 @@
 #include "../writter.h"
 
 #define GENMON_STR_SIZE 512
+#define RX_MAX_MBITS_PER_SEC 60
+#define TX_MAX_MBITS_PER_SEC 10
 
 const char* sys_mon_name = "sys-mon-genmon";
 const char* color_temp = "#db7632";
@@ -21,14 +23,10 @@ const char* color_disk_write = "#c671eb";
 const char* color_rx = "#5197b3";
 const char* color_tx = "#8751b3";
 
-const char* progress_bar_blocks[] = {" ", "\xE2\x96\x81", "\xE2\x96\x82", "\xE2\x96\x83", "\xE2\x96\x84", "\xE2\x96\x85", "\xE2\x96\x86", "\xE2\x96\x87", "\xE2\x96\x87"};
-
-const int progress_bar_blocks_len = 9;
-
 char genmon_str[GENMON_STR_SIZE];
 writter_t wr = {.buffer = genmon_str, .pos = 0, .len = GENMON_STR_SIZE};
 
-int choose(int n, int min, int max, int val) {
+static int choose(int n, int min, int max, int val) {
     if (val < min)
         val = min;
     if (val > max)
@@ -43,14 +41,30 @@ int choose(int n, int min, int max, int val) {
     return idx;
 }
 
-const char* bar_symbol(unsigned int max, unsigned int value, bool show_nonzero_value) {
-    int idx = choose(progress_bar_blocks_len, 0, max, value);
-    if (idx == 0 && value > 0 && show_nonzero_value)
-        idx = 1;
-    return progress_bar_blocks[idx];
+static const char bar_char(int width, int level) {
+    static const char level_start[] = {"%0aA"};
+    return level_start[width] + level;
 }
 
-void append_colored_text(const char* text, const char* color) {
+static const char* bar_string(unsigned int max, unsigned int value, bool show_nonzero_value) {
+    static char char_str[2] = " ";
+    int idx = choose(11, 0, max, value);
+    if (idx == 0 && value > 0 && show_nonzero_value)
+        idx = 1;
+
+    char_str[0] = 'a' + idx;
+    return char_str;
+}
+
+static void append_char(char c) {
+    write_char(&wr, c);
+}
+
+static void append_text(char const* txt) {
+    write_string(&wr, txt);
+}
+
+static void append_colored_text(const char* text, const char* color) {
     write_string(&wr, "<span fgcolor=\"");
     write_string(&wr, color);
     write_string(&wr, "\">");
@@ -58,21 +72,21 @@ void append_colored_text(const char* text, const char* color) {
     write_string(&wr, "</span>");
 }
 
-void append_start_color(const char* color) {
+static void append_start_color(const char* color) {
     write_string(&wr, "<span fgcolor=\"");
     write_string(&wr, color);
     write_string(&wr, "\">");
 }
 
-void append_section_end() {
+static void append_section_end() {
     write_string(&wr, "</span>");
 }
 
-void append_text(char const* txt) {
-    write_string(&wr, txt);
+static void append_bars_start() {
+    append_text("<span font_desc=\"BlockBarsGaps 12\">");
 }
 
-void append_uint(unsigned int x) {
+static void append_uint(unsigned int x) {
     write_uint(&wr, x);
 }
 
@@ -84,9 +98,16 @@ int main() {
     sys_mon_read_data(sys_mon, buffer, 512);
     sys_mon_close(sys_mon);
 
-    unsigned int cpu_usage, core_0, core_1, mem, t1, t2, freq_0, freq_1, sda_rb, sda_wb, sdb_rb, sdb_wb, rx, tx;
-    sscanf(buffer, "%d%d%d%d%d%d%d%d%d%d%d%d%d%d",
-           &cpu_usage, &core_0, &core_1, &mem, &t1, &t2, &freq_0, &freq_1, &sda_rb, &sda_wb, &sdb_rb, &sdb_wb, &rx, &tx);
+    unsigned int cpu_usage,
+        core_0, core_1,
+        mem,
+        t1, t2,
+        freq_0, freq_1,
+        sda_rb, sda_wb, sdb_rb, sdb_wb,
+        rx, tx,
+        update_time_ms;
+    sscanf(buffer, "%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d",
+           &cpu_usage, &core_0, &core_1, &mem, &t1, &t2, &freq_0, &freq_1, &sda_rb, &sda_wb, &sdb_rb, &sdb_wb, &rx, &tx, &update_time_ms);
 
     freq_0 /= 1000;
     freq_1 /= 1000;
@@ -108,14 +129,17 @@ int main() {
     append_text("<txt>");
     append_start_color(color_temp);
     append_uint(max_temp);
-    append_text("°C ");
+    append_text("°C");
     append_section_end();
 
-    append_colored_text(bar_symbol(100, core_0, false), color_freq[choose(4, 2000, 3000, freq_0)]);
-    append_colored_text(bar_symbol(100, core_1, false), color_freq[choose(4, 2000, 3000, freq_1)]);
+    append_bars_start();
+    append_char(bar_char(1, 0));
+    append_colored_text(bar_string(100, core_0, false), color_freq[choose(4, 2000, 3000, freq_0)]);
+    append_colored_text(bar_string(100, core_1, false), color_freq[choose(4, 2000, 3000, freq_1)]);
+    append_char(bar_char(1, 0));
+    append_section_end();
 
     append_start_color(color_cpu);
-    append_text(" ");
 
     if (cpu_usage == 100)
         append_text("##");
@@ -131,18 +155,24 @@ int main() {
     append_uint(mem / 10);
     append_text(".");
     append_uint(mem % 10);
-    append_text("G ");
+    append_text("G");
     append_section_end();
-    append_colored_text(bar_symbol(5000000, sda_rb, true), color_disk_read);
-    append_colored_text(bar_symbol(5000000, sda_wb, true), color_disk_write);
-    append_colored_text(bar_symbol(5000000, sdb_rb, true), color_disk_read);
-    append_colored_text(bar_symbol(5000000, sdb_wb, true), color_disk_write);
-    append_colored_text(bar_symbol(60 * 1000000 / 8 * 2, rx, true), color_rx);
-    append_colored_text(bar_symbol(10 * 1000000 / 8 * 2, tx, true), color_tx);
-    append_text(" </txt>");
 
+    append_bars_start();
+    append_char(bar_char(1, 0));
+    append_colored_text(bar_string(5000000, sda_rb, true), color_disk_read);
+    append_colored_text(bar_string(5000000, sda_wb, true), color_disk_write);
+    append_colored_text(bar_string(5000000, sdb_rb, true), color_disk_read);
+    append_colored_text(bar_string(5000000, sdb_wb, true), color_disk_write);
+    append_colored_text(bar_string(RX_MAX_MBITS_PER_SEC * update_time_ms * 1000 / 8, rx, true), color_rx);
+    append_colored_text(bar_string(TX_MAX_MBITS_PER_SEC * update_time_ms * 1000 / 8, tx, true), color_tx);
+    append_char(bar_char(1, 0));
 
-    if (write_char(&wr, 0) == -1){
+    append_section_end();
+
+    append_text("</txt>");
+
+    if (write_char(&wr, 0) == -1) {
         fprintf(stderr, "string writting error. probably buffer length not enough");
         exit(-1);
     }

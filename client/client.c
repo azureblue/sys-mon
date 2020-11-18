@@ -27,6 +27,8 @@ sys_mon_handle_t* sys_mon_open(const char* name) {
         exit(-1);
     }
 
+    
+
     struct shared_buf* sh_buf = mmap(NULL, sizeof(struct shared_buf),
                                      PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
