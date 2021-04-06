@@ -18,18 +18,18 @@ name = sys-mon
 cpu
 ram available
 ```
-To read the data you can use functions from client/client.h, or as an example use simple-client
+To read the data you can use functions from client/client.h (and linking with client/client.lo), or as an example use simple-client
 
 `./simple-client sys-mon`
 
 That should output two lines:
- - total cpu usage percentage
+ - total cpu idle percentage
  - available memory in KB
 ```
-4
+96
 5293112
 ```
-Each line correspondes to the module specified in the [modules] section of the config file.
+Each line correspondes to each module line specified in the [modules] section of the config file.
 
 More complex config:
 ```
@@ -37,43 +37,79 @@ More complex config:
 name = sys-mon-genmon
 
 [modules]
-cpu 2
+cpu total_idle idle
 ram available
 generic /sys/class/hwmon/hwmon0/temp2_input
 generic /sys/class/hwmon/hwmon0/temp3_input
+generic /sys/class/hwmon/hwmon0/temp4_input
+generic /sys/class/hwmon/hwmon0/temp5_input
 generic /sys/bus/cpu/devices/cpu0/cpufreq/cpuinfo_cur_freq
 generic /sys/bus/cpu/devices/cpu1/cpufreq/cpuinfo_cur_freq
-disk_activity sda r_sectors w_sectors
-disk_activity sdb r_sectors w_sectors
-
+generic /sys/bus/cpu/devices/cpu2/cpufreq/cpuinfo_cur_freq
+generic /sys/bus/cpu/devices/cpu3/cpufreq/cpuinfo_cur_freq
+disk_activity sda r_ticks w_ticks
+disk_activity sdb r_ticks w_ticks
+time diff
 ```
 
 and output:
 
 ```
-12 10 15
-5286380
+85 85 83 87 85 
+5746700 
+37000
 34000
-32000
+42000
+40000
 2000000
+2000000
+2833000
 2333000
-0 0
-0 0
+0 26 
+0 56 
+2002
 ```
 
-And that's it!
+And that's it! :)
+
+## Config
+#### Config file divided into two sections: `[sys-mon]` and `[modules]`. General settings are in the `[sys-mon]` section.
+#### [sys-mon] config:
+`name = NAME` - name of sys-mon instance (reading sys-mon data will refer to it) - mandatory
+
+`[auto-update = true|false]` - if present and true, sys-mon data will be updated in the fixed time interval, otherwise all the updates will be invoked by the client
+
+`[update_ms = TIME(ms)]` - auto update interval (only relevant when `auto-update` is true)
+
+
+When `auto-update` is true, it's possible to read data just by reading shm file located in `/dev/shm/NAME/` like `cat /dev/shm/sys-mon`, though the reading should stop at the first null (0x00) character since in the sys-mon shm file there is some binary data at the end.
+Example config:
+```
+[sys-mon]
+name = sys-mon-auto
+auto_update = true
+update_ms = 1000
+[modules]
+cpu
+ram avail
+time diff
+```
 
 ## Modules
+#### Modules sections starts after `[modules]` in the config file.
 ### cpu
-#### Cpu / cores usage in percentage.
+#### Cpu (total / per cores) usage info in percentage.
 ##### Config
-`cpu [cores]`
+`cpu ['total_user', 'total_nice', 'total_system', 'total_idle', 'total_io', 'total_irq', 'total_softirq', 'total_steal', 'total_guest', 'total_guest_nice', 'user', 'nice', 'system', 'idle', 'io', 'irq', 'softirq', 'steal', 'guest', 'guest_nice']`
 ##### Description
-`[cores]`: number of cores [optional], when specified it will output usage for each core next to the total usage
+Those parameters correspond with data in /proc/stat [https://man7.org/linux/man-pages/man5/proc.5.html]. For each flag prefixed with `total_` there will be a single number in the output (overall cpu time spent in specific task in percentage). For each flag *not* prefixed with `total_` where will be a number *for each core*. For example, assuming 4-core cpu, and mudule config `cpu total_idle idle`, the output will consist of 5 numbers, somethig like `83 85 83 81 84`, where the first number is the overall (total) cpu idle percentage (usualy the average of the per core numbers).
+**Flag order doesn't matter, the values in the output will follow flag order described above**, for example `cpu total_idle guest` and `cpu guest total_idle` will output the same line.
+
+Then no parameters are provided it will output `total_idle`.
 ##### Example config lines
 `cpu`
-
-`cpu 4`
+`cpu total_idle idle io`
+`cpu total_idle total_io`
 
 ### ram
 #### Ram usage in KB.
@@ -100,11 +136,28 @@ And that's it!
 ### generic
 #### Reads data from file and prints to the output.
 ##### Config
-`generic path`
+`generic path ['diff']`
 ##### Description
 `path`: full path to file (probably from /sys/ of /proc/)
+`'diff'`: if `diff` is presnt the output will the difference between updates
 ##### Example config lines
 `generic /sys/bus/cpu/devices/cpu0/cpufreq/scaling_cur_freq`
+
+`generic /sys/class/net/enp0s25/statistics/rx_bytes diff`
+
+`generic /sys/class/net/enp0s25/statistics/tx_bytes diff`
+
+### time
+#### Prints current time / time diff.
+##### Config
+`time ['current', 'diff']`
+##### Description
+If param `current` is present it will output UTC time in millis, if `diff` is present it will output time between updates in millis.
+Then no parameters are provided it will act as if `current` is provided.
+##### Example config lines
+`time`
+
+`time diff`
 
 # Background
 
