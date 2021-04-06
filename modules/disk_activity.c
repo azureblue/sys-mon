@@ -31,7 +31,7 @@ static int update_data(disk_activity_data_t *disk_data) {
     uint32_t fields_bitset = disk_data->fields_bitset;
     for (int i = 0; i < 8; i++) {
         if (fields_bitset & 1)
-            read_next_uint(&disk_data->data[i]);
+            read_next_uint32(&disk_data->data[i]);
         else
             skip_next(fd);
         fields_bitset >>= 1;

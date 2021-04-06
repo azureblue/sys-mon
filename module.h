@@ -16,4 +16,4 @@ struct module_config {
 typedef struct module_config module_config_t;
 typedef module_config_t (*module_init)(const char * module_args);
 
-#endif
+#endif /* MODULE_H */

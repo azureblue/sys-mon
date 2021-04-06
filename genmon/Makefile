@@ -7,15 +7,14 @@ OBJS=$(SRCS:.c=.o)
 %.o : %.c
 	gcc -c -rdynamic $(CFLAGS) $< -o $@
 
-all: genmon genmon2
+all: genmon sys-mon-pango.so
 
-genmon: genmon.o
-	gcc $(CFLAGS) genmon.o $(FOREIGN_OBJS) -o genmon -lrt -lpthread
+genmon: genmon.o sys-mon-pango.o
+	gcc $(CFLAGS) genmon.o sys-mon-pango.o $(FOREIGN_OBJS) -o genmon -lrt -lpthread
 	strip -sx genmon
 
-genmon2: genmon2.o
-	gcc $(CFLAGS) genmon2.o $(FOREIGN_OBJS) -o genmon2 -lrt -lpthread
-	strip -sx genmon2
+sys-mon-pango.so: sys-mon-pango.o
+	gcc $(CFLAGS) -fvisibility=hidden  sys-mon-pango.o $(FOREIGN_OBJS) -fPIC -shared -o sys-mon-pango.so -lrt -lpthread
 
 beep: $(OBJS_BEEP)
 	gcc $(CFLAGS) $(OBJS_BEEP) -o beep
@@ -23,4 +22,4 @@ beep: $(OBJS_BEEP)
 	sudo chmod 4775 beep
 
 clean:
-	rm -f *.o a.out */*.o */*.a */*.lo genmon genmon2
+	rm -f *.o a.out */*.o */*.a */*.lo */*.so genmon

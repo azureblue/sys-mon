@@ -11,3 +11,5 @@ genmon/genmon2
 genmon/beep
 .vscode
 .scratch
+*_test_*
+a.out

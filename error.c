@@ -12,7 +12,13 @@ noreturn void exit_with_error(const char* restrict format, ...) {
    exit(-1);
 }
 
-noreturn void exit_with_perror(const char* msg) {
-   perror(msg);
+noreturn void exit_with_perror(const char* restrict msg_format, ...) {
+   va_list arglist;
+   va_start( arglist, msg_format );
+   vfprintf(stderr, msg_format, arglist);
+   fprintf(stderr, ":");
+   va_end( arglist );
+   perror(NULL);
    exit(-1);
 }
+

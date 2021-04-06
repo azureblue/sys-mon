@@ -19,4 +19,4 @@ int write_char(writter_t *wr, char c);
 int write_uint(writter_t *wr, unsigned int i);
 int write_int64(writter_t *wr, int64_t i);
 
-#endif
+#endif /* WRITTER_H */

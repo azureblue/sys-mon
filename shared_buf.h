@@ -2,8 +2,8 @@
 #include <semaphore.h>
 
 enum sys_mon_sync_method {
-    SYS_MON_SYNC_IP_WO_R,
-    SYS_MON_SYNC_WP_R_OP
+    SYS_MON_SYNC_SEMS,
+    SYS_MON_SYNC_NONE
 };
 
 typedef enum sys_mon_sync_method sys_mon_sync_method_t;

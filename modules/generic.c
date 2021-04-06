@@ -56,7 +56,7 @@ module_config_t module_init_generic(const char *args) {
 
     int fd = open(path, O_RDONLY);
     if (fd == -1)
-        exit_with_perror("generic module: init failed");
+        exit_with_perror("[generic module (%s)] init failed", path);
 
     module_config_t config;
     config.write_data = write_data;

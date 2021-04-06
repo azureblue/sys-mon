@@ -59,6 +59,8 @@ void parse_modules_config(FILE* conf) {
     memptr_t dl = dlopen(NULL, RTLD_LAZY);
     char line[MAX_CONF_LINE_SIZE + 1];
     while (fgets(line, MAX_CONF_LINE_SIZE + 1, conf) != NULL) {
+        if (string_starts_with(line, "#"))
+            continue;
         if (string_is_empty(line))
             continue;
         if (line[0] == '[') {
@@ -194,7 +196,7 @@ int main(int argc, char* args[]) {
     parse_config(config_path);
 
     mode_t old_umask = umask(0);
-    int shm_fd = shm_open(sys_mon_config.shm_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IROTH);
+    int shm_fd = shm_open(sys_mon_config.shm_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IWOTH | S_IROTH);
     umask(old_umask);
 
     if (shm_fd == -1) {
@@ -206,8 +208,7 @@ int main(int argc, char* args[]) {
         perror("ftruncate failed");
         exit(-1);
     }
-    sh_buf = mmap(NULL, sizeof(struct shared_buf),
-                  PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    sh_buf = mmap(NULL, sizeof(struct shared_buf), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
     if (sh_buf == MAP_FAILED) {
         perror("map failed");
@@ -220,16 +221,11 @@ int main(int argc, char* args[]) {
     pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST);
     pthread_mutex_init(&sh_buf->mutex, &mattr);
     pthread_mutexattr_destroy(&mattr);
-    // pthread_condattr_t cattr;
-    // pthread_condattr_init(&cattr);
-    // pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
-    // pthread_cond_init(&sh_buf->cond, &cattr);
-    // pthread_condattr_destroy(&cattr);
 
     wr = (writter_t){.buffer = sh_buf->data, .len = SHARED_SIZE, .pos = 0};
 
     if (sys_mon_config.auto_update == false) {
-        sh_buf->sync_method = SYS_MON_SYNC_IP_WO_R;
+        sh_buf->sync_method = SYS_MON_SYNC_SEMS;
 
         sem_init(&sh_buf->in, 1, 0);
         sem_init(&sh_buf->out, 1, 0);
@@ -240,7 +236,7 @@ int main(int argc, char* args[]) {
             sem_post(&sh_buf->out);
         }
     } else {
-        sh_buf->sync_method = SYS_MON_SYNC_WP_R_OP;
+        sh_buf->sync_method = SYS_MON_SYNC_NONE;
         sem_init(&sh_buf->in, 1, 1);
         timer_create(CLOCK_MONOTONIC, NULL, &sys_mon_timer);
 

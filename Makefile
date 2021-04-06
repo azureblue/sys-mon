@@ -1,5 +1,5 @@
 CFLAGS= -O3 -flto -std=c11  -fno-stack-protector
-#CFLAGS= -g -std=c11  -fno-stack-protector
+#  CFLAGS= -g -std=c11  -fno-stack-protector
 
 SRCS=$(wildcard *.c) $(wildcard modules/*.c)
 OBJS=$(SRCS:.c=.o)
@@ -8,7 +8,7 @@ OBJS=$(SRCS:.c=.o)
 	gcc -c -rdynamic $(CFLAGS) $< -o $@
 
 %.lo : %.c
-	gcc -fPIC -c  -rdynamic $(CFLAGS) $< -o $@
+	gcc -fPIC -c -rdynamic $(CFLAGS) $< -o $@
 
 all: sys-mon genmon
 
@@ -23,10 +23,10 @@ simple-client: client.a
 	gcc $(CFLAGS) client/simple-client.c client.a -lrt -lpthread -o simple-client
 
 genmon:
-	@make -C genmon
+	+ @make -C genmon
 
 clean:
-	@make -C genmon clean
+	+ @make -C genmon clean
 	rm -f *.o a.out */*.o */*.a */*.lo simple-client sys-mon client.a
 
 .PHONY: genmon clean all
