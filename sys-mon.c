@@ -51,6 +51,7 @@ char shm_name_buff[32] = "sys-mon";
 
 sys_mon_config_t sys_mon_config = {
     .auto_update = false,
+    .update_ms = 2000,
     .shm_name = shm_name_buff};
 
 void section_config(FILE* conf, const char* section_line);

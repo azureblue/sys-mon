@@ -135,7 +135,7 @@ module_config_t module_init_cpu(const char *args) {
         exit_with_perror("cpu usage module init failed");
 
     if (args == NULL || string_is_empty(args))
-        args = "total usage";
+        args = "total_idle";
 
     uint32_t fields_bitset = 0;
     char arg_buffer[64];
