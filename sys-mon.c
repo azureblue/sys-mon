@@ -1,6 +1,5 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
-#include <dlfcn.h>
 #include <errno.h>
 #include <semaphore.h>
 #include <signal.h>
@@ -21,7 +20,6 @@
 #include "string_utils.h"
 #include "writter.h"
 
-#define MAX_CONF_LINE_SIZE 256
 #ifndef MAX_MODULES
 #define MAX_MODULES 32
 #endif
@@ -31,13 +29,6 @@ static module_config_t modules[MAX_MODULES];
 static int modules_n = 0;
 static struct shared_buf* sh_buf;
 writter_t wr;
-
-struct module_config_spec {
-    const char* module_name;
-    const char* module_args;
-};
-
-typedef struct module_config_spec module_config_spec_t;
 
 struct sys_mon_config {
     bool auto_update;
@@ -57,7 +48,6 @@ sys_mon_config_t sys_mon_config = {
 void section_config(FILE* conf, const char* section_line);
 
 void parse_modules_config(FILE* conf) {
-    memptr_t dl = dlopen(NULL, RTLD_LAZY);
     char line[MAX_CONF_LINE_SIZE + 1];
     while (fgets(line, MAX_CONF_LINE_SIZE + 1, conf) != NULL) {
         if (string_starts_with(line, "#"))
@@ -75,19 +65,7 @@ void parse_modules_config(FILE* conf) {
         if (strlen(line) > MAX_CONF_LINE_SIZE)
             exit_with_error("invalid conf file, line too long");
 
-        char module_name[32];
-        if (sscanf(line, "%31s", module_name) != 1)
-            exit_with_error("invalid config line: %d", modules_n + 1);
-
-        char module_init_name[50] = "module_init_";
-        strcat(module_init_name, module_name);
-
-        module_init init = dlsym(dl, module_init_name);
-
-        if (init == NULL)
-            exit_with_error("can't load module %s: %s", module_name, dlerror());
-
-        modules[modules_n] = init(line + strlen(module_name));
+        modules[modules_n] = sys_mon_load_module(line);
         modules_n++;
     }
     fclose(conf);
@@ -180,7 +158,7 @@ void parse_config(const char* path) {
 void update() {
     wr.pos = 0;
     for (int i = 0; i < modules_n; i++) {
-        modules[i].write_data(modules[i].data, &wr);
+        sys_mon_module_write_data(&modules[i], &wr);
         write_char(&wr, '\n');
     }
     if (write_char(&wr, 0) == -1) {

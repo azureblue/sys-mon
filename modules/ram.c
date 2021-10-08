@@ -17,7 +17,7 @@ struct ram_data {
     uint32_t lines_bitset;
 };
 
-typedef struct ram_data ram_data;
+typedef struct ram_data ram_data_t;
 
 enum mem_info_key {
     mem_info_key_total = 0,
@@ -36,7 +36,7 @@ const uint32_t F_CHANGE = 1 << 31;
 
 static int write_data(module_data data, writter_t *wr) {
     char buf[16];
-    ram_data *mem_data = data;
+    ram_data_t *mem_data = data;
     int fd = mem_data->fd;
     uint32_t lines_bitset = mem_data->lines_bitset;
     lseek(fd, 0, SEEK_SET);
@@ -59,7 +59,13 @@ int check_key(mem_info_key_t key, const char *info) {
     return line_numbers[key];
 }
 
-module_config_t module_init_ram(const char *args) {
+static void unload(module_data data) {
+    ram_data_t *mem_data = data;
+    close(mem_data->fd);
+    free(data);
+}
+
+module_config_t sys_mon_module_init_ram(const char *args) {
     if (string_is_empty(args))
         args = "available";
 
@@ -107,9 +113,10 @@ module_config_t module_init_ram(const char *args) {
             exit_with_error("module [ram] init failed: invalid argument: %s\n", arg);
     }
     module_config_t config;
-    config.data = calloc(1, sizeof(ram_data));
-    ((ram_data *)config.data)->fd = fd;
-    ((ram_data *)config.data)->lines_bitset = flags;
+    config.data = calloc(1, sizeof(ram_data_t));
+    ((ram_data_t *)config.data)->fd = fd;
+    ((ram_data_t *)config.data)->lines_bitset = flags;
     config.write_data = write_data;
+    config.unload = unload;
     return config;
 }

@@ -1,4 +1,4 @@
-CFLAGS= -O3 -flto -std=c11  -fno-stack-protector
+CFLAGS= -O3 -flto -std=c11  -fno-stack-protector -fvisibility=hidden
 #  CFLAGS= -g -std=c11  -fno-stack-protector
 
 SRCS=$(wildcard *.c) $(wildcard modules/*.c)
@@ -13,7 +13,7 @@ OBJS=$(SRCS:.c=.o)
 all: sys-mon genmon
 
 sys-mon: $(OBJS) simple-client
-	gcc $(CFLAGS) --whole-file -rdynamic $(OBJS) -lrt -lpthread -ldl -o sys-mon
+	gcc $(CFLAGS) --whole-file -rdynamic $(OBJS) -lrt -lpthread -o sys-mon
 	strip -sx sys-mon
 
 client.a: client/client.lo

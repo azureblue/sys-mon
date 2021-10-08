@@ -45,7 +45,12 @@ static int write_data(module_data data, writter_t *wr) {
     }
 }
 
-module_config_t module_init_time(const char *args) {
+static void unload(module_data data) {
+    time_data_t *time_data = data;
+    free(data);
+}
+
+module_config_t sys_mon_module_init_time(const char *args) {
     if (string_is_empty(args))
         args = "current";
 
@@ -66,6 +71,7 @@ module_config_t module_init_time(const char *args) {
     module_config_t config;
     config.write_data = write_data;
     config.data = calloc(1, sizeof (time_data_t));
+    config.unload = unload;
     ((time_data_t *)config.data)->flags = flags;
     load_data(config.data);
     return config;

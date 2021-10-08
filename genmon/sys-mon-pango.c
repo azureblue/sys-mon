@@ -5,17 +5,26 @@
 #include <unistd.h>
 
 #include "sys-mon-pango.h"
-#include "../client/client.h"
-#include "../shared_buf.h"
+#include "../module.h"
 #include "../writter.h"
 
 #define RX_MAX_MBITS_PER_SEC 60
 #define TX_MAX_MBITS_PER_SEC 10
 
+struct sys_mon_pango {
+    module_config_t cpu;
+    module_config_t ram;
+    module_config_t temp[4];
+    module_config_t freq[4];
+    module_config_t sda;
+    module_config_t sdb;
+    module_config_t time;
+};
+
 static const char* sys_mon_name = "sys-mon-genmon";
 static const char* color_temp = "#db7632";
 static const char* color_ram = "#50b9ff";
-static const char* color_cpu = "#bf9cff";
+static const char* color_gpu_usage = "#bf9cff";
 static const char* color_freq[] = {"#2a72f7", "#a147f5", "#f53387"};
 static const char* color_disk_read = "#2a72f7";
 static const char* color_disk_write = "#d94aae";
@@ -99,15 +108,68 @@ static inline void run_and_ignore(const char * command) {
     int x = system(command);
 }
 
-__attribute__ ((visibility ("default"))) int sys_mon_plugin_write_pango_string(char *buf, int len) {
-    wr =  (writter_t){.buffer = buf, .pos = 0, .len = len};
+__attribute__ ((visibility ("default")))
+sys_mon_pango_t * sys_mon_pango_init() {
+    sys_mon_pango_t *handle = malloc(sizeof(sys_mon_pango_t));
+    if (handle == NULL)
+        exit(-1);
 
-    sys_mon_handle_t* sys_mon = sys_mon_open(sys_mon_name);
+    handle->cpu = sys_mon_load_module("cpu total_idle idle");
+    handle->ram = sys_mon_load_module("ram available");
+    handle->temp[0] = sys_mon_load_module("generic /sys/class/hwmon/hwmon0/temp2_input");
+    handle->temp[1] = sys_mon_load_module("generic /sys/class/hwmon/hwmon0/temp3_input");
+    handle->temp[2] = sys_mon_load_module("generic /sys/class/hwmon/hwmon0/temp4_input");
+    handle->temp[3] = sys_mon_load_module("generic /sys/class/hwmon/hwmon0/temp5_input");
+    handle->freq[0] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu0/cpufreq/cpuinfo_cur_freq");
+    handle->freq[1] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu1/cpufreq/cpuinfo_cur_freq");
+    handle->freq[2] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu2/cpufreq/cpuinfo_cur_freq");
+    handle->freq[3] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu3/cpufreq/cpuinfo_cur_freq");
+    handle->sda = sys_mon_load_module("disk_activity sda r_ticks w_ticks");
+    handle->sdb = sys_mon_load_module("disk_activity sdb r_ticks w_ticks");
+    handle->time = sys_mon_load_module("time diff");
+    return handle;
+}
+
+__attribute__ ((visibility ("default")))
+void sys_mon_pango_close(sys_mon_pango_t *handle) {
+    sys_mon_unload_module(&handle->cpu);
+    sys_mon_unload_module(&handle->ram);
+    for (int i = 0; i < 4; i++) {
+        sys_mon_unload_module(&handle->temp[i]);
+        sys_mon_unload_module(&handle->freq[i]);
+    }
+    sys_mon_unload_module(&handle->sda);
+    sys_mon_unload_module(&handle->sdb);
+    sys_mon_unload_module(&handle->time);
+    free(handle);
+}
+
+static inline int append_module_output(module_config_t * conf, writter_t * wt) {
+    sys_mon_module_write_data(conf, wt);
+    return write_char(wt, '\n');
+}
+__attribute__ ((visibility ("default")))
+int sys_mon_plugin_write_pango_string(sys_mon_pango_t *handle, char *buf, int len) {
+    wr = (writter_t){.buffer = buf, .pos = 0, .len = len};
 
     char buffer[512];
+    writter_t module_output_writter =  (writter_t){.buffer = buffer, .pos = 0, .len = 512};
+
+    append_module_output(&handle->cpu, &module_output_writter);
+    append_module_output(&handle->ram, &module_output_writter);
+    append_module_output(&handle->temp[0], &module_output_writter);
+    append_module_output(&handle->temp[1], &module_output_writter);
+    append_module_output(&handle->temp[2], &module_output_writter);
+    append_module_output(&handle->temp[3], &module_output_writter);
+    append_module_output(&handle->freq[0], &module_output_writter);
+    append_module_output(&handle->freq[1], &module_output_writter);
+    append_module_output(&handle->freq[2], &module_output_writter);
+    append_module_output(&handle->freq[3], &module_output_writter);
+    append_module_output(&handle->sda, &module_output_writter);
+    append_module_output(&handle->sdb, &module_output_writter);
+    append_module_output(&handle->time, &module_output_writter);
+
     char char_str[2] = " ";
-    sys_mon_read_data(sys_mon, buffer, 512);
-    sys_mon_close(sys_mon);
 
     unsigned int cpu_usage,
         usage[5],
@@ -172,7 +234,7 @@ __attribute__ ((visibility ("default"))) int sys_mon_plugin_write_pango_string(c
     append_char(space(0));
     append_section_end();
 
-    append_start_color(color_cpu);
+    append_start_color(color_gpu_usage);
 
     if (usage[0] == 100)
         append_text("##");

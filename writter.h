@@ -11,7 +11,6 @@ struct writter_t {
 
 typedef struct writter_t writter_t;
 
-
 int writter_get_size(writter_t *wr);
 
 int write_string(writter_t *wr, const char *str);

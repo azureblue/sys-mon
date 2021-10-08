@@ -37,7 +37,13 @@ static int write_data(module_data data, writter_t *wr) {
     }
 }
 
-module_config_t module_init_generic(const char *args) {
+static void unload(module_data data) {
+    gen_data_t *gen_data = data;
+    close(gen_data->fd);
+    free(data);
+}
+
+module_config_t sys_mon_module_init_generic(const char *args) {
   uint32_t lines_bitset = 0;
     bool diff = false;
     char path[128];
@@ -65,5 +71,6 @@ module_config_t module_init_generic(const char *args) {
     ((gen_data_t *)config.data)->diff = diff;
     if (diff)
         preload_data(config.data);
+    config.unload = unload;
     return config;
  }

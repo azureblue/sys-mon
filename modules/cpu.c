@@ -128,7 +128,13 @@ int bit_count_slow(uint32_t x) {
     return count;
 }
 
-module_config_t module_init_cpu(const char *args) {
+static void unload(module_data data) {
+    cpu_data_t *cpu_data = data;
+    close(cpu_data->fd);
+    free(data);
+}
+
+module_config_t sys_mon_module_init_cpu(const char *args) {
     int fd = open("/proc/stat", O_RDONLY);
 
     if (fd == -1)
@@ -187,6 +193,7 @@ module_config_t module_init_cpu(const char *args) {
     cpu_data->cpus = cpus;
     cpu_data->flags = fields_bitset;
     config.write_data = write_data;
+    config.unload = unload;
     preload_data(config.data);
     return config;
 }

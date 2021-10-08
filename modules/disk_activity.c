@@ -58,7 +58,13 @@ static int write_data(module_data data, writter_t *wr) {
     return 0;
 }
 
-module_config_t module_init_disk_activity(const char *args) {
+void static unload(module_data data) {
+    disk_activity_data_t *disk_data = data;
+    close(disk_data->fd);
+    free(data);
+}
+
+module_config_t sys_mon_module_init_disk_activity(const char *args) {
     uint32_t fields_bitset = 0;
     bool change_only = true;
     char path[128];
@@ -106,5 +112,6 @@ module_config_t module_init_disk_activity(const char *args) {
     ((disk_activity_data_t *)config.data)->change_only = change_only;
     update_data(config.data);
     config.write_data = write_data;
+    config.unload = unload;
     return config;
 }

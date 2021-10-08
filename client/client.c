@@ -84,4 +84,5 @@ int sys_mon_read_data(sys_mon_handle_t* handle, char* buffer, int buffer_size) {
 void sys_mon_close(sys_mon_handle_t* handle) {
     munmap(handle->sh_buf, sizeof(shared_buf_t));
     close(handle->shm_fd);
+    free(handle);
 }
