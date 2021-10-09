@@ -1,7 +1,6 @@
-CFLAGS= -O3 -flto -std=c11  -fno-stack-protector -fvisibility=hidden
+CFLAGS= -g  -std=c11  -fno-stack-protector -fvisibility=hidden
 FOREIGN_OBJS= ../client.a $(filter-out ../sys-mon.o, $(wildcard ../*.o))
 MODULES_OBJS=$(wildcard ../modules/*.o)
-
 
 SRCS=$(wildcard *.c)
 OBJS=$(SRCS:.c=.o)
@@ -9,11 +8,15 @@ OBJS=$(SRCS:.c=.o)
 %.o : %.c
 	gcc -c -rdynamic $(CFLAGS) $< -o $@
 
-all: genmon sys-mon-pango.so
+all: $(FOREIGN_OBJS) genmon sys-mon-pango.so sys-mon-pango-tooltip.so
 
 genmon: genmon.o
 	gcc $(CFLAGS) genmon.o -o genmon -ldl
-	strip -sx genmon
+	# strip -sx genmon
+
+sys-mon-pango-tooltip.so: sys-mon-pango-tooltip.o ../writter.o block-bars-utils.o
+	gcc $(CFLAGS)  sys-mon-pango-tooltip.o ../writter.o block-bars-utils.o -fvisibility=hidden  -rdynamic  -fPIC -shared -o sys-mon-pango-tooltip.so
+	# strip -sx sys-mon-pango-tooltip.so
 
 sys-mon-pango.so: sys-mon-pango.o
 	gcc $(CFLAGS)  sys-mon-pango.o -fvisibility=hidden --whole-file -rdynamic $(MODULES_OBJS) $(FOREIGN_OBJS) -fPIC -shared -o sys-mon-pango.so

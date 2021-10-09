@@ -25,5 +25,12 @@ int main() {
     }
     sys_mon_pango_close(handle);
     printf("<txt>%s</txt>\n", buf);
+
+    dlclose(dl);
+    dl = dlopen("/home/konrad/sys-mon/genmon/sys-mon-pango-tooltip.so", RTLD_LAZY);
+    static char buf2[2048] = {0};
+    int (*sys_mon_pango_tooltip_print)(char *, int) = dlsym(dl, "sys_mon_plugin_write_pango_tooltip_string");
+    sys_mon_pango_tooltip_print(buf2, 2048);
+    printf("%s", buf2);
     return 0;
 }
