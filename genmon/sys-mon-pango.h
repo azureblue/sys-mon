@@ -1,8 +1,8 @@
 #ifndef SYS_MON_PANGO_H
 #define SYS_MON_PANGO_H
 
-struct sys_mon_pango;
-typedef struct sys_mon_pango sys_mon_pango_t;
+struct system_info_data;
+typedef struct system_info_data sys_mon_pango_t;
 
 sys_mon_pango_t * sys_mon_pango_init();
 

@@ -7,17 +7,17 @@
 
 #define GENMON_STR_SIZE 1024
 
-struct sys_mon_pango;
+struct system_info_data;
 
 int main() {
     char buf[GENMON_STR_SIZE];
     void *dl = dlopen("/home/konrad/sys-mon/genmon/sys-mon-pango.so", RTLD_LAZY);
 
-    int (*sys_mon_plugin_write_pango_string)(struct sys_mon_pango *handle, char *buf, int len) = dlsym(dl, "sys_mon_plugin_write_pango_string");
-    struct sys_mon_pango *(*sys_mon_pango_init)()  = dlsym(dl, "sys_mon_pango_init");
-    void (*sys_mon_pango_close)(struct sys_mon_pango *handle) = dlsym(dl, "sys_mon_pango_close");
+    int (*sys_mon_plugin_write_pango_string)(struct system_info_data *handle, char *buf, int len) = dlsym(dl, "sys_mon_plugin_write_pango_string");
+    struct system_info_data *(*sys_mon_pango_init)()  = dlsym(dl, "sys_mon_pango_init");
+    void (*sys_mon_pango_close)(struct system_info_data *handle) = dlsym(dl, "sys_mon_pango_close");
 
-    struct sys_mon_pango *handle = sys_mon_pango_init();
+    struct system_info_data *handle = sys_mon_pango_init();
     if (sys_mon_plugin_write_pango_string(handle, buf, GENMON_STR_SIZE) == -1) {
         fprintf(stderr, "string writting error. probably buffer length not enough");
         printf("string writting error. probably buffer length not enough");

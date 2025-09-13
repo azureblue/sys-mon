@@ -6,9 +6,10 @@
 
 const char *DF = "bash -c \"df --output=avail,pcent,source,target -h | grep -vP 'run|/dev$|cgroup' | sed -E '1d;s/^ //g;s/,/./g;s/  +/ /g;s/%//g;s/\\S*\\/([^\\/]+)/\\1/g;s/(sd.)[0-9]+/\\1/g'\"";
 const char *NVIDIA_GPU_INFO = "bash -c \"nvidia-settings -t -q [gpu:0]/GPUUtilization -q [gpu:0]/TotalDedicatedGPUMemory -q [gpu:0]/UsedDedicatedGPUMemory -q [gpu:0]/GPUCurrentClockFreqs -q [gpu:0]/GPUCoreTemp | sed 's/\\S*=//g;s/,/ /g'\"";
-
+const char *SWAP_INFO = "bash -c \"swapon --show=NAME,SIZE,USED --noheadings --raw --bytes | sed 's/\\/dev\\///g' \"";
+const char *MEM_INFO = "bash -c \"cat /proc/meminfo | head -n5\"";
 static const char* color_ram = "#50b9ff";
-static const char* color_gpu_usage = "#bf9cff";
+static const char* color_cpu_usage = "#bf9cff";
 static const char* color_temp = "#db7632";
 static const char* color_freq[] = {"#2a72f7", "#a147f5", "#d94aae"};
 static const char* color_sda = "#cccccc";
@@ -42,7 +43,7 @@ int sys_mon_plugin_write_pango_tooltip_string(char *buf, int len) {
         write_string(&wr, "°C");
         write_section_end(&wr);
         write_char(&wr, ' ');
-        write_start_color(&wr, color_gpu_usage);
+        write_start_color(&wr, color_cpu_usage);
         write_uint(&wr, gpu_gpu);
         write_char(&wr, '%');
         write_char(&wr, ' ');
@@ -74,6 +75,83 @@ int sys_mon_plugin_write_pango_tooltip_string(char *buf, int len) {
         write_section_end(&wr);
         write_char(&wr, '\n');
         write_char(&wr, '\n');
+    }
+    fp = popen(MEM_INFO, "r");
+    if (fp) {
+        write_string(&wr, "ram:\n");
+        int ram_total;
+        int ram_avail;
+        int ram_free;
+        int ram_cache;
+        int ram_buffers;
+
+        fscanf(fp, "%*s %d %*s %*s %d %*s %*s %d %*s %*s %d %*s %*s %d %*s", &ram_total, &ram_free, &ram_avail, &ram_buffers, &ram_cache);
+
+        pclose(fp);
+        write_start_color(&wr, "#a19f9c");
+
+        write_string(&wr, "  total: ");
+        write_start_color(&wr, "#e1dfdc");
+        write_uint(&wr, ram_total / 1024);
+        write_section_end(&wr);
+        write_char(&wr, 'M');
+        write_char(&wr, '\n');
+        write_string(&wr, "   free: ");
+        write_start_color(&wr, "#e1dfdc");
+        write_uint(&wr, ram_free / 1024);
+        write_section_end(&wr);
+        write_char(&wr, 'M');
+        write_char(&wr, '\n');
+        write_string(&wr, "  avail: ");
+        write_start_color(&wr, "#e1dfdc");
+        write_uint(&wr, ram_avail / 1024);
+        write_section_end(&wr);
+        write_char(&wr, 'M');
+        write_char(&wr, '\n');
+        write_string(&wr, "buffers: ");
+        write_start_color(&wr, "#e1dfdc");
+        write_uint(&wr, ram_buffers / 1024);
+        write_section_end(&wr);
+        write_char(&wr, 'M');
+        write_char(&wr, '\n');
+        write_string(&wr, " cached: ");
+        write_start_color(&wr, "#e1dfdc");
+        write_uint(&wr, ram_cache / 1024);
+        write_section_end(&wr);
+        write_char(&wr, 'M');
+        write_section_end(&wr);
+        write_char(&wr, '\n');
+        write_char(&wr, '\n');
+
+    }
+    fp = popen(SWAP_INFO, "r");
+    if (fp) {
+        write_string(&wr, "swap:\n");
+        char buf[64];
+        int total_swap_bytes;
+        int used_swap_bytes;
+        fscanf(fp, "%s%d%d", buf, &total_swap_bytes, &used_swap_bytes);
+        pclose(fp);
+        int percentage = used_swap_bytes * 100 / total_swap_bytes;
+        write_start_color(&wr, "#a19f9c");
+        int used_mb = used_swap_bytes / 1000 / 1000;
+        if (used_mb < 10)
+            write_char(&wr, ' ');
+        if (used_mb < 100)
+            write_char(&wr, ' ');
+
+        write_uint(&wr, used_mb);
+        write_char(&wr, 'M');
+        write_char(&wr, ' ');
+        write_bars_start(&wr);
+        write_string(&wr, pie_string(100, percentage, false));
+        write_section_end(&wr);
+        write_char(&wr, ' ');
+        write_string(&wr, buf);
+        write_section_end(&wr);
+        write_char(&wr, '\n');
+        write_char(&wr, '\n');
+
     }
     fp = popen(DF, "r");
     if (fp) {
@@ -124,5 +202,4 @@ int main() {
     sys_mon_plugin_write_pango_tooltip_string(out, 2048);
     puts(out);
     return 0;
-
 }

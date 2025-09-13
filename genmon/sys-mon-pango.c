@@ -11,22 +11,22 @@
 #define RX_MAX_MBITS_PER_SEC 60
 #define TX_MAX_MBITS_PER_SEC 10
 
-struct sys_mon_pango {
+struct system_info_data {
     module_config_t cpu;
     module_config_t ram;
     module_config_t temp[4];
     module_config_t freq[4];
-    module_config_t sda;
-    module_config_t sdb;
+    // module_config_t sda;
+    //module_config_t sdb;
     module_config_t time;
 };
 
 static const char* sys_mon_name = "sys-mon-genmon";
 static const char* color_temp = "#db7632";
 static const char* color_ram = "#50b9ff";
-static const char* color_gpu_usage = "#bf9cff";
+static const char* color_cpu_usage = "#bf9cff";
 static const char* color_freq[] = {"#2a72f7", "#a147f5", "#f53387"};
-static const char* color_disk_read = "#2a72f7";
+static const char* color_disk_read = "#46a2f2";
 static const char* color_disk_write = "#d94aae";
 static const char* color_rx = "#5197b3";
 static const char* color_tx = "#8751b3";
@@ -115,17 +115,17 @@ sys_mon_pango_t * sys_mon_pango_init() {
         exit(-1);
 
     handle->cpu = sys_mon_load_module("cpu total_idle idle");
-    handle->ram = sys_mon_load_module("ram available");
-    handle->temp[0] = sys_mon_load_module("generic /sys/class/hwmon/hwmon0/temp2_input");
-    handle->temp[1] = sys_mon_load_module("generic /sys/class/hwmon/hwmon0/temp3_input");
-    handle->temp[2] = sys_mon_load_module("generic /sys/class/hwmon/hwmon0/temp4_input");
-    handle->temp[3] = sys_mon_load_module("generic /sys/class/hwmon/hwmon0/temp5_input");
-    handle->freq[0] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu0/cpufreq/cpuinfo_cur_freq");
-    handle->freq[1] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu1/cpufreq/cpuinfo_cur_freq");
-    handle->freq[2] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu2/cpufreq/cpuinfo_cur_freq");
-    handle->freq[3] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu3/cpufreq/cpuinfo_cur_freq");
-    handle->sda = sys_mon_load_module("disk_activity sda r_ticks w_ticks");
-    handle->sdb = sys_mon_load_module("disk_activity sdb r_ticks w_ticks");
+    handle->ram = sys_mon_load_module("ram free");
+    handle->temp[0] = sys_mon_load_module("generic /tmp/.sys-mon/temp2");
+    handle->temp[1] = sys_mon_load_module("generic /tmp/.sys-mon/temp3");
+    handle->temp[2] = sys_mon_load_module("generic /tmp/.sys-mon/temp4");
+    handle->temp[3] = sys_mon_load_module("generic /tmp/.sys-mon/temp5");
+
+    handle->freq[0] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu0/cpufreq/scaling_cur_freq");
+    handle->freq[1] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu1/cpufreq/scaling_cur_freq");
+    handle->freq[2] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu2/cpufreq/scaling_cur_freq");
+    handle->freq[3] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu3/cpufreq/scaling_cur_freq");
+
     handle->time = sys_mon_load_module("time diff");
     return handle;
 }
@@ -138,8 +138,8 @@ void sys_mon_pango_close(sys_mon_pango_t *handle) {
         sys_mon_unload_module(&handle->temp[i]);
         sys_mon_unload_module(&handle->freq[i]);
     }
-    sys_mon_unload_module(&handle->sda);
-    sys_mon_unload_module(&handle->sdb);
+    // sys_mon_unload_module(&handle->sda);
+    //sys_mon_unload_module(&handle->sdb);
     sys_mon_unload_module(&handle->time);
     free(handle);
 }
@@ -165,14 +165,14 @@ int sys_mon_plugin_write_pango_string(sys_mon_pango_t *handle, char *buf, int le
     append_module_output(&handle->freq[1], &module_output_writter);
     append_module_output(&handle->freq[2], &module_output_writter);
     append_module_output(&handle->freq[3], &module_output_writter);
-    append_module_output(&handle->sda, &module_output_writter);
-    append_module_output(&handle->sdb, &module_output_writter);
+    // append_module_output(&handle->sda, &module_output_writter);
+  //  append_module_output(&handle->sdb, &module_output_writter);
     append_module_output(&handle->time, &module_output_writter);
 
     char char_str[2] = " ";
 
     unsigned int cpu_usage,
-        usage[5],
+        usage[9],
         // io[5], nothing,
         mem,
         temp[4],
@@ -183,27 +183,31 @@ int sys_mon_plugin_write_pango_string(sys_mon_pango_t *handle, char *buf, int le
 
     sscanf(buffer, "%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d",
            &usage[0],
-           &usage[1], &usage[2], &usage[3], &usage[4],
+           &usage[1], &usage[3], &usage[5], &usage[7],
+           &usage[2], &usage[4], &usage[6], &usage[8],
            &mem,
            &temp[0], &temp[1], &temp[2], &temp[3],
            &freq[0], &freq[1], &freq[2], &freq[3],
-           &sda_r_time, &sda_w_time, &sdb_r_time, &sdb_w_time,
+        //    &sda_r_time, &sda_w_time, &sdb_r_time, &sdb_w_time,
         //    &rx, &tx,
             &update_time_ms);
 
 
     int max_temp = 0;
     // int max_io = 0;
+    for (int i = 0; i < 9; i++) {
+        usage[i] = 100 - usage[i];
+    }
+
     for (int i = 0; i < 4; i++) {
-        if (temp[i] > max_temp)
+         if (temp[i] > max_temp)
             max_temp = temp[i];
         // if (io[i + 1] > max_io)
         //     max_io = io[i + 1];
         freq[i] /= 1000;
-        usage[i] = 100 - usage[i];
     }
 
-    usage[4] = 100 - usage[4];
+    // usage[8] = 100 - usage[8];
 
     max_temp /= 1000;
     mem /= 100000;
@@ -224,17 +228,33 @@ int sys_mon_plugin_write_pango_string(sys_mon_pango_t *handle, char *buf, int le
     append_text("°C");
     append_section_end();
 
+
     append_bars_start();
     append_char(space(0));
 
-    append_colored_text(bar_string(100, usage[1], false, 2), color_freq[choose(3, 2000, 2833, freq[0])]);
-    append_colored_text(bar_string(100, usage[2], false, 2), color_freq[choose(3, 2000, 2833, freq[1])]);
-    append_colored_text(bar_string(100, usage[3], false, 2), color_freq[choose(3, 2000, 2833, freq[2])]);
-    append_colored_text(bar_string(100, usage[4], false, 2), color_freq[choose(3, 2000, 2833, freq[3])]);
-    append_char(space(0));
+// int col0 = 2; if (freq[0] < 3700) col0 = 1; if (freq[0] < 3000) col0 = 0;
+// int col1 = 2; if (freq[1] < 3700) col1 = 1; if (freq[1] < 3000) col1 = 0;
+// int col2 = 2; if (freq[2] < 3700) col2 = 1; if (freq[2] < 3000) col2 = 0;
+// int col3 = 2; if (freq[3] < 3700) col3 = 1; if (freq[3] < 3000) col3 = 0;
+//    append_colored_text(bar_string(100, usage[1], false, 2), color_freq[choose(3, 800, 4000, freq[0])]);
+  //  append_colored_text(bar_string(100, usage[2], false, 2), color_freq[choose(3, 800, 4000, freq[1])]);
+  //  append_colored_text(bar_string(100, usage[3], false, 2), color_freq[choose(3, 800, 4000, freq[2])]);
+   // append_colored_text(bar_string(100, usage[4], false, 2), color_freq[choose(3, 800, 4000, freq[3])]);
+append_start_color("#c109d6");
+    append_text(bar_string(100, usage[1], false, 2));
+    append_text(bar_string(100, usage[2], false, 2));
+    append_text(bar_string(100, usage[3], false, 2));
+    append_text(bar_string(100, usage[4], false, 2));
+    append_text(bar_string(100, usage[5], false, 2));
+    append_text(bar_string(100, usage[6], false, 2));
+    append_text(bar_string(100, usage[7], false, 2));
+    append_text(bar_string(100, usage[8], false, 2));
+append_section_end();
+
+append_char(space(0));
     append_section_end();
 
-    append_start_color(color_gpu_usage);
+    append_start_color(color_cpu_usage);
 
     if (usage[0] == 100)
         append_text("##");
@@ -247,19 +267,23 @@ int sys_mon_plugin_write_pango_string(sys_mon_pango_t *handle, char *buf, int le
     append_text("% ");
     append_section_end();
     append_start_color(color_ram);
-    append_uint(mem / 10);
+    int mem_gb = mem / 10;
+    if (mem_gb < 10)
+	append_text(" ");
+
+    append_uint(mem_gb);
     append_text(".");
     append_uint(mem % 10);
     append_text("G");
     append_section_end();
 
-    append_bars_start();
-    append_char(space(0));
+    // append_bars_start();
+    // append_char(space(0));
 
-    unsigned int sda_time = sda_r_time > sda_w_time ? sda_r_time : sda_w_time;
-    unsigned int sdb_time = sdb_r_time > sdb_w_time ? sdb_r_time : sdb_w_time;
-    append_colored_text(bar_string(update_time_ms, sda_time, true, 2), sda_r_time > sda_w_time ? color_disk_read : color_disk_write);
-    append_colored_text(bar_string(update_time_ms, sdb_time, true, 2), sdb_r_time > sdb_w_time ? color_disk_read : color_disk_write);
+    // append_colored_text(bar_string(update_time_ms, sda_r_time, true, 1), color_disk_read);
+    // append_colored_text(bar_string(update_time_ms, sda_w_time, true, 1), color_disk_write);
+//    append_colored_text(bar_string(update_time_ms, sdb_r_time, true, 1), color_disk_read);
+//    append_colored_text(bar_string(update_time_ms, sdb_w_time, true, 1), color_disk_write);
     // append_colored_text(bar_string(update_time_ms, sda_r_time, true, 2), color_disk_read);
     // append_colored_text(bar_string(update_time_ms, sda_w_time, true, 2), color_disk_write);
     // append_colored_text(bar_string(update_time_ms, sdb_r_time, true, 2), color_disk_read);
@@ -267,9 +291,10 @@ int sys_mon_plugin_write_pango_string(sys_mon_pango_t *handle, char *buf, int le
 
     // append_colored_text(bar_string(RX_MAX_MBITS_PER_SEC * update_time_ms * 1000 / 8, rx, true, 2), color_rx);
     // append_colored_text(bar_string(TX_MAX_MBITS_PER_SEC * update_time_ms * 1000 / 8, tx, true, 2), color_tx);
-    append_char(space(0));
-    append_section_end();
+    // append_char(space(0));
+    // append_section_end();
 
+    append_text(" ");
     if (write_char(&wr, 0) == -1) {
         return -1;
     }
