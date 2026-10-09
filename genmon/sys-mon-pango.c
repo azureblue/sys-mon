@@ -18,8 +18,13 @@ struct system_info_data {
     module_config_t freq[4];
     // module_config_t sda;
     //module_config_t sdb;
+    module_config_t gpu_rc6;
     module_config_t time;
 };
+
+#define cpu_usage_color_even "#a62cb3"
+#define cpu_usage_color_odd "#4900f4"
+#define gpu_usage_color "#307899"
 
 static const char* sys_mon_name = "sys-mon-genmon";
 static const char* color_temp = "#db7632";
@@ -108,6 +113,68 @@ static inline void run_and_ignore(const char * command) {
     int x = system(command);
 }
 
+static inline void sort4_u32(uint32_t a[4]) {
+    uint32_t t;
+    if (a[0] > a[1]) { t=a[0]; a[0]=a[1]; a[1]=t; }
+    if (a[2] > a[3]) { t=a[2]; a[2]=a[3]; a[3]=t; }
+    if (a[0] > a[2]) { t=a[0]; a[0]=a[2]; a[2]=t; }
+    if (a[1] > a[3]) { t=a[1]; a[1]=a[3]; a[3]=t; }
+    if (a[1] > a[2]) { t=a[1]; a[1]=a[2]; a[2]=t; }
+}
+
+static inline void swap_pairs_if_greater_u32(uint32_t a[8]) {
+    for (int i = 0; i < 4; ++i) {
+        uint32_t x = a[i];
+        uint32_t y = a[i + 4];
+        uint32_t mask = 0u - (x > y);     // 0xFFFFFFFF if x>y, else 0
+        uint32_t t = (x ^ y) & mask;
+        a[i]      = x ^ t;                // min(x,y)
+        a[i + 4]  = y ^ t;                // max(x,y)
+    }
+}
+
+static inline void cswap_pair_u32(uint32_t a[8], int i, int j)
+{
+    uint32_t x0 = a[i];
+    uint32_t y0 = a[j];
+    uint32_t x1 = a[i + 4];
+    uint32_t y1 = a[j + 4];
+
+    uint32_t mask = 0u - (x0 > y0);      // 0xFFFFFFFF if x0>y0 else 0
+    uint32_t t;
+
+    // swap keys
+    t = (x0 ^ y0) & mask;
+    x0 ^= t; y0 ^= t;
+
+    // swap attached values in the same way
+    t = (x1 ^ y1) & mask;
+    x1 ^= t; y1 ^= t;
+
+    a[i]     = x0;
+    a[j]     = y0;
+    a[i + 4] = x1;
+    a[j + 4] = y1;
+}
+
+static inline void sort4_pairs_u32(uint32_t a[8])
+{
+    cswap_pair_u32(a, 0, 1);
+    cswap_pair_u32(a, 2, 3);
+    cswap_pair_u32(a, 0, 2);
+    cswap_pair_u32(a, 1, 3);
+    cswap_pair_u32(a, 1, 2);
+}
+
+static inline void sort4_u8(uint32_t a[4]) {
+    uint32_t t;
+    if (a[0] > a[1]) { t=a[0]; a[0]=a[1]; a[1]=t; }
+    if (a[2] > a[3]) { t=a[2]; a[2]=a[3]; a[3]=t; }
+    if (a[0] > a[2]) { t=a[0]; a[0]=a[2]; a[2]=t; }
+    if (a[1] > a[3]) { t=a[1]; a[1]=a[3]; a[3]=t; }
+    if (a[1] > a[2]) { t=a[1]; a[1]=a[2]; a[2]=t; }
+}
+
 __attribute__ ((visibility ("default")))
 sys_mon_pango_t * sys_mon_pango_init() {
     sys_mon_pango_t *handle = malloc(sizeof(sys_mon_pango_t));
@@ -127,6 +194,7 @@ sys_mon_pango_t * sys_mon_pango_init() {
     handle->freq[3] = sys_mon_load_module("generic /sys/bus/cpu/devices/cpu3/cpufreq/scaling_cur_freq");
 
     handle->time = sys_mon_load_module("time diff");
+    handle->gpu_rc6 = sys_mon_load_module("generic /tmp/.sys-mon/gpu_r6_ms diff");
     return handle;
 }
 
@@ -168,36 +236,54 @@ int sys_mon_plugin_write_pango_string(sys_mon_pango_t *handle, char *buf, int le
     // append_module_output(&handle->sda, &module_output_writter);
   //  append_module_output(&handle->sdb, &module_output_writter);
     append_module_output(&handle->time, &module_output_writter);
+    append_module_output(&handle->gpu_rc6, &module_output_writter);
 
     char char_str[2] = " ";
 
-    unsigned int cpu_usage,
-        usage[9],
+    uint32_t cpu_usage,
+        total_usage,
+        usage[8],
+        usage_sums[4],
         // io[5], nothing,
         mem,
         temp[4],
         freq[4],
         sda_r_time, sda_w_time, sdb_r_time, sdb_w_time,
         rx, tx,
-        update_time_ms;
+        update_time_ms,
+        gpu_rc6;
 
-    sscanf(buffer, "%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d",
-           &usage[0],
-           &usage[1], &usage[3], &usage[5], &usage[7],
-           &usage[2], &usage[4], &usage[6], &usage[8],
+    sscanf(buffer, "%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d",
+           &total_usage,
+           &usage[0], &usage[1], &usage[2], &usage[3],
+           &usage[4], &usage[5], &usage[6], &usage[7],
            &mem,
            &temp[0], &temp[1], &temp[2], &temp[3],
            &freq[0], &freq[1], &freq[2], &freq[3],
         //    &sda_r_time, &sda_w_time, &sdb_r_time, &sdb_w_time,
         //    &rx, &tx,
-            &update_time_ms);
+            &update_time_ms,
+            &gpu_rc6);
 
+    swap_pairs_if_greater_u32(usage);
+    sort4_pairs_u32(usage);
 
     int max_temp = 0;
     // int max_io = 0;
-    for (int i = 0; i < 9; i++) {
+    total_usage = 100 - total_usage;
+    for (int i = 0; i < 8; i++) {
         usage[i] = 100 - usage[i];
     }
+
+    double gpu_usage = 1.0 - ((double) gpu_rc6 / (double) update_time_ms);
+    gpu_usage = gpu_usage * gpu_usage * gpu_usage;
+
+    // usage_sums[0] = usage[0] + usage[4];
+    // usage_sums[1] = usage[1] + usage[5];
+    // usage_sums[2] = usage[2] + usage[6];
+    // usage_sums[3] = usage[3] + usage[7];
+
+    // sort4_u32(usage_sums);
 
     for (int i = 0; i < 4; i++) {
          if (temp[i] > max_temp)
@@ -240,28 +326,48 @@ int sys_mon_plugin_write_pango_string(sys_mon_pango_t *handle, char *buf, int le
   //  append_colored_text(bar_string(100, usage[2], false, 2), color_freq[choose(3, 800, 4000, freq[1])]);
   //  append_colored_text(bar_string(100, usage[3], false, 2), color_freq[choose(3, 800, 4000, freq[2])]);
    // append_colored_text(bar_string(100, usage[4], false, 2), color_freq[choose(3, 800, 4000, freq[3])]);
-append_start_color("#c109d6");
-    append_text(bar_string(100, usage[1], false, 2));
-    append_text(bar_string(100, usage[2], false, 2));
-    append_text(bar_string(100, usage[3], false, 2));
-    append_text(bar_string(100, usage[4], false, 2));
-    append_text(bar_string(100, usage[5], false, 2));
-    append_text(bar_string(100, usage[6], false, 2));
-    append_text(bar_string(100, usage[7], false, 2));
-    append_text(bar_string(100, usage[8], false, 2));
-append_section_end();
+
+// append_start_color(cpu_usage_color_even);
+//     append_text(bar_string(100, usage[0], false, 2));
+//     append_text(bar_string(100, usage[4], false, 2));
+// append_section_end();
+// append_start_color(cpu_usage_color_odd);
+//     append_text(bar_string(100, usage[1], false, 2));
+//     append_text(bar_string(100, usage[5], false, 2));
+// append_section_end();
+// append_start_color(cpu_usage_color_even);
+//     append_text(bar_string(100, usage[2], false, 2));
+//     append_text(bar_string(100, usage[6], false, 2));
+// append_section_end();
+// append_start_color(cpu_usage_color_odd);
+//     append_text(bar_string(100, usage[3], false, 2));
+//     append_text(bar_string(100, usage[7], false, 2));
+    // append_text(bar_string(200, usage_sums[0], false, 2));
+    // append_text(bar_string(200, usage_sums[1], false, 2));
+    // append_text(bar_string(200, usage_sums[2], false, 2));
+    // append_text(bar_string(200, usage_sums[3], false, 2));
+// append_section_end();
+append_colored_text(bar_string(100, usage[0], false, 2), cpu_usage_color_even);
+append_colored_text(bar_string(100, usage[4], false, 2), cpu_usage_color_odd);
+append_colored_text(bar_string(100, usage[1], false, 2), cpu_usage_color_even);
+append_colored_text(bar_string(100, usage[5], false, 2), cpu_usage_color_odd);
+append_colored_text(bar_string(100, usage[2], false, 2), cpu_usage_color_even);
+append_colored_text(bar_string(100, usage[6], false, 2), cpu_usage_color_odd);
+append_colored_text(bar_string(100, usage[3], false, 2), cpu_usage_color_even);
+append_colored_text(bar_string(100, usage[7], false, 2), cpu_usage_color_odd);
+append_colored_text(bar_string(100, (int)(gpu_usage * 100), false, 1), gpu_usage_color);
 
 append_char(space(0));
     append_section_end();
 
     append_start_color(color_cpu_usage);
 
-    if (usage[0] == 100)
+    if (total_usage == 100)
         append_text("##");
     else {
-        if (usage[0] < 10)
+        if (total_usage < 10)
             append_text(" ");
-        append_uint(usage[0]);
+        append_uint(total_usage);
     }
 
     append_text("% ");
