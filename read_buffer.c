@@ -1,10 +1,5 @@
 #include "read_buffer.h"
 
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/fcntl.h>
 #include <unistd.h>
 
 #define likely(x) __builtin_expect((x), 1)
@@ -65,8 +60,6 @@ inline static read_result_t skip_whitespaces() {
         if (next() != read_result_ok)
             return last_error;
     };
-
-    return read_result_ok;
 }
 
 read_result_t read_start(int fd) {
@@ -126,10 +119,12 @@ read_result_t read_next_int64(int64_t *out) {
 
     uint64_t res = 0;
     bool neg = (get() == '-');
+    if (neg && next() != read_result_ok)
+        return last_error;
 
     while (true) {
         if (!is_number(get())) {
-            *out = res;
+            *out = neg ? -(int64_t)res : (int64_t)res;
             return read_result_ok;
         }
         res *= 10;
@@ -137,7 +132,7 @@ read_result_t read_next_int64(int64_t *out) {
 
         if (next() != read_result_ok) {
             if (last_error == read_result_eof) {
-                *out = res;
+                *out = neg ? -(int64_t)res : (int64_t)res;
                 return read_result_ok;
             }
             return last_error;
@@ -168,8 +163,10 @@ read_result_t read_next_string(char *dst, int n) {
             return read_result_ok;
         }
         *dst++ = buffer[pos];
-        if (next() != read_result_ok)
+        if (next() != read_result_ok) {
+            *dst = 0;
             return last_error;
+        }
     }
 }
 
@@ -182,5 +179,15 @@ read_result_t skip_next() {
             return read_result_ok;
         if (next() != read_result_ok)
             return last_error;
+    }
+}
+
+read_result_t skip_past(char c) {
+    while (true) {
+        char cur = get();
+        if (next() != read_result_ok)
+            return cur == c ? read_result_ok : last_error;
+        if (cur == c)
+            return read_result_ok;
     }
 }
